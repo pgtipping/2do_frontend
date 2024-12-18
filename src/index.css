@@ -1,0 +1,69 @@
+/* Add these new styles to your existing CSS */
+.similar-categories-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.similar-categories-modal p {
+  margin: 0;
+  color: #64748b;
+}
+
+.similar-categories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.similar-category-button {
+  background: #f8fafc;
+  color: var(--text);
+  text-align: left;
+  padding: 0.75rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.similar-category-button:hover {
+  background: #e2e8f0;
+}
+
+.create-anyway-button {
+  background: var(--primary);
+}
+
+.modal-title {
+  margin: 0 0 1rem 0;
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+/* Update existing modal styles */
+.modal-content {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  min-width: 300px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.category-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.category-modal-form input {
+  width: 100%;
+  box-sizing: border-box;
+}

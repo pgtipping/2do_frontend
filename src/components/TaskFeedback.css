@@ -1,0 +1,76 @@
+.task-feedback {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.feedback-message {
+  font-size: 14px;
+  color: #2c3e50;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 4px;
+  border-left: 4px solid #4caf50;
+}
+
+.feedback-section {
+  margin: 12px 0;
+}
+
+.feedback-section h4 {
+  font-size: 14px;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.feedback-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.feedback-section li {
+  font-size: 13px;
+  color: #34495e;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+}
+
+.feedback-section li:before {
+  content: "•";
+  color: #4caf50;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.feedback-section.questions .question-item {
+  background: #fff;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.question-item p {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #2c3e50;
+}
+
+.question-item input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.question-item input:focus {
+  outline: none;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}

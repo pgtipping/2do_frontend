@@ -1,0 +1,100 @@
+.categories {
+  margin: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.filter-buttons,
+.category-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.category-btn {
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  position: relative;
+  background-color: var(--category-light-bg);
+  color: var(--category-text);
+}
+
+/* Active state with 1px border */
+.category-btn.active:not(.system):not(.default) {
+  border: 1px solid var(--category-text);
+}
+
+/* Swap colors on hover */
+.category-btn:hover:not(.system):not(.default) {
+  background-color: var(--category-text);
+  color: white;
+}
+
+/* Keep border on active hover */
+.category-btn.active:not(.system):not(.default):hover {
+  border: 1px solid var(--category-text);
+}
+
+/* System and Default Categories */
+.category-btn.system,
+.category-btn.default {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.category-btn.system:hover,
+.category-btn.default:hover {
+  background-color: #e0e0e0;
+  color: #444;
+}
+
+/* Only add padding for removable categories */
+.category-btn:not(.system):not(.default) {
+  padding-right: 28px;
+}
+
+/* Delete button styles */
+.category-remove {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.category-remove:hover {
+  opacity: 0.8;
+}
+
+/* Animation for category changes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
