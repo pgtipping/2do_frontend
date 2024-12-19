@@ -399,23 +399,36 @@ function TodoList({
     );
   };
 
+  const provideFeedback = (feedback, analysis) => {
+    if (!feedback) return;
+
+    if (isListening) {
+      speakToUser(feedback.voice);
+    }
+
+    // Always show visual feedback
+    setTaskFeedback({
+      ...feedback,
+      requiresAttention:
+        !analysis?.completeness && analysis?.missing_info?.length > 0,
+    });
+
+    // Update analysis state
+    setTaskAnalysis(analysis);
+  };
+
   const parseTask = async (input) => {
     try {
       setIsProcessing(true);
       setTaskFeedback(null);
       setTaskAnalysis(null);
 
-      // Resolve relative dates in the input
       const resolvedInput = resolveRelativeDate(input);
-
-      // First get LLM feedback and task parsing
       const parseResponse = await fetch(
         "http://localhost:5000/api/parse-task",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userInput: resolvedInput,
             requestSource: isListening ? "voice" : "text",
@@ -425,10 +438,10 @@ function TodoList({
                 current_time: new Date().toLocaleString(),
               },
               tasks: {
-                recent: todos.slice(-5), // Last 5 tasks
-                similar: findRelatedTasks(todos, input), // Tasks similar to current input
-                today: todos.filter((t) => t.isToday), // Today's tasks
-                category: todos.filter((t) => t.category === filter).slice(-3), // Last 3 from current category
+                recent: todos.slice(-5),
+                similar: findRelatedTasks(todos, input),
+                today: todos.filter((t) => t.isToday),
+                category: todos.filter((t) => t.category === filter).slice(-3),
                 patterns: {
                   common_times: getCommonTaskTimes(todos),
                   preferred_days: getPreferredDays(todos),
@@ -448,69 +461,62 @@ function TodoList({
       );
 
       const data = await parseResponse.json();
-      console.log("=== Task Creation Data Flow ===");
-      console.log("1. Raw response from /api/parse-task:", data);
-      console.log("2. Task data from response:", data.task);
-
-      // Update feedback state with LLM's feedback
-      setTaskFeedback(data.feedback);
-      setTaskAnalysis(data.analysis);
 
       if (!data.success) {
-        console.log("3. Task creation failed:", data.error);
         throw new Error(data.error || "Failed to create task");
       }
 
-      // Handle confirmation required
-      if (data.requiresConfirmation) {
-        console.log("3. Task requires confirmation");
-        if (data.feedback?.voice) {
-          speakToUser(data.feedback.voice);
-        }
-        return;
-      }
-
-      // If we have task data, create the task
       if (data.task) {
-        // Create the task object
         const taskToAdd = {
           id: Date.now().toString(),
-          text: data.task.title,
+          title: data.task.title,
           description: data.task.description || "",
-          dueDate: data.task.due_date || null,
-          priority: data.task.priority?.toLowerCase() || "medium",
-          status: data.task.status || "pending",
+          priority: {
+            level: data.task.priority.level || "Unspecified",
+            reasoning: data.task.priority.reasoning || "Not provided",
+          },
+          temporal: {
+            due_date: data.task.temporal?.due_date || "unspecified",
+            start_date: data.task.temporal?.start_date || "unspecified",
+            recurrence: data.task.temporal?.recurrence || null,
+          },
+          status: data.task.status || "Untracked",
           tags: data.task.tags || [],
-          isImportant:
-            data.task.priority === "Critical" || data.task.priority === "High",
-          completed: data.task.status === "COMPLETED",
-          reminder: data.task.reminder || null,
-          recurrence: data.task.recurrence || null,
-          category: filter,
-          categories: data.task.categories || [],
-          isToday: data.task.due_date
-            ? new Date(data.task.due_date).toDateString() ===
-              new Date().toDateString()
-            : filter === "Today",
-          startDate: data.task.start_date || null,
-          completionDate: data.task.completion_date || null,
+          dependencies: data.task.dependencies || [],
+          metadata: {
+            isImportant:
+              data.task.priority.level === "Critical" ||
+              data.task.priority.level === "High",
+            category: data.task.categories?.[0] || "Unspecified",
+            completeness: data.analysis?.completeness || 0,
+            requires_attention: data.analysis?.missing_info?.length > 0,
+          },
         };
 
-        console.log("3. Task object created from backend data:", {
-          backendTask: data.task,
-          frontendTask: taskToAdd,
-        });
-
-        // Add the task through the parent's handler
         const createdTask = await onAddTodo(taskToAdd);
-        console.log("4. Task returned from addTodo:", createdTask);
 
-        // Provide feedback
-        if (data.feedback?.voice && isListening) {
-          speakToUser(data.feedback.voice);
+        if (data.analysis?.completeness === 1) {
+          provideFeedback(
+            {
+              voice: `I've created your task: ${taskToAdd.title}`,
+              display: "Task created successfully",
+              type: "success",
+            },
+            data.analysis
+          );
+        } else {
+          provideFeedback(
+            {
+              voice: `I've created your task with some details marked as unspecified. You can update them later.`,
+              display: "Task created with some details pending",
+              type: "info",
+              action: "update_later",
+              requiresAttention: true,
+            },
+            data.analysis
+          );
         }
 
-        // Add to recent actions
         setRecentActions((prev) => [
           ...prev,
           {
@@ -518,54 +524,38 @@ function TodoList({
             taskId: createdTask.id,
             timestamp: new Date().toISOString(),
             task: taskToAdd,
+            requires_completion: data.analysis?.completeness < 1,
           },
         ]);
 
-        // Clear input
         setNewTask("");
         setDueDate("");
         setReminder("");
         setRecurrence("");
+      } else {
+        provideFeedback(
+          {
+            voice:
+              data.feedback?.voice ||
+              "I need more information to create this task.",
+            display: data.feedback?.display || "Additional information needed",
+            type: "pending",
+            requiresAttention: true,
+          },
+          data.analysis
+        );
       }
     } catch (error) {
       console.error("Error creating task:", error);
-
-      // Get LLM error feedback
-      try {
-        const errorResponse = await fetch(
-          "http://localhost:5000/api/error-feedback",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              error: error.message,
-              context: {
-                input: input,
-                action: "create_task",
-              },
-            }),
-          }
-        );
-
-        const errorFeedback = await errorResponse.json();
-        setTaskFeedback(errorFeedback.feedback);
-
-        if (errorFeedback.feedback?.voice && isListening) {
-          speakToUser(errorFeedback.feedback.voice);
-        }
-      } catch (feedbackError) {
-        console.error("Error getting LLM feedback:", feedbackError);
-        // Provide basic error feedback if LLM feedback fails
-        setTaskFeedback({
+      provideFeedback(
+        {
           voice: "Sorry, I encountered an error. Please try again.",
           display: "Error creating task",
-        });
-        if (isListening) {
-          speakToUser("Sorry, I encountered an error. Please try again.");
-        }
-      }
+          type: "error",
+          requiresAttention: true,
+        },
+        null
+      );
     } finally {
       setIsProcessing(false);
     }

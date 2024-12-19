@@ -53,13 +53,14 @@ function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
   };
 
   const renderCategories = () => {
-    if (!todo.categories || todo.categories.length === 0) return null;
+    if (!todo.metadata?.categories || todo.metadata.categories.length === 0)
+      return null;
 
     const allCategories = { ...DEFAULT_CATEGORIES, ...getCustomCategories() };
 
     return (
       <div className="todo-categories">
-        {todo.categories.map((categoryKey) => {
+        {todo.metadata.categories.map((categoryKey) => {
           const category = allCategories[categoryKey];
           if (!category) return null;
 
@@ -77,38 +78,44 @@ function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
     );
   };
 
+  const isCompleted = todo.status === "COMPLETED";
+  const isImportant = todo.metadata?.isImportant;
+
+  const handleCheckboxClick = (e) => {
+    e.stopPropagation();
+    toggleTodo(todo.id);
+  };
+
+  const handleStarClick = (e) => {
+    e.stopPropagation();
+    toggleImportant(todo.id);
+  };
+
   return (
     <div
-      className={`todo-item ${todo.completed ? "completed" : ""} ${
-        todo.isImportant ? "important" : ""
+      className={`todo-item ${isCompleted ? "completed" : ""} ${
+        isImportant ? "important" : ""
       }`}
       onClick={() => onSelectTask(todo)}
     >
-      <div
-        className="todo-checkbox"
-        onClick={(e) => {
-          e.stopPropagation();
-          toggleTodo(todo.id);
-        }}
-      />
+      <div className="todo-checkbox" onClick={handleCheckboxClick} />
       <div className="todo-content">
-        <span className="todo-title">{todo.text}</span>
+        <span className="todo-title">{todo.title}</span>
         {renderCategories()}
       </div>
       <div className="todo-metadata">
         <button
-          className={`todo-star-button ${todo.isImportant ? "active" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleImportant(todo.id);
-          }}
+          className={`todo-star-button ${isImportant ? "active" : ""}`}
+          onClick={handleStarClick}
         >
           ⭐
         </button>
-        {todo.dueDate && (
-          <span className="todo-due-date">{formatDateTime(todo.dueDate)}</span>
+        {todo.temporal?.due_date && (
+          <span className="todo-due-date">
+            {formatDateTime(todo.temporal.due_date)}
+          </span>
         )}
-        {todo.isToday && !todo.dueDate && (
+        {todo.metadata?.category === "Today" && !todo.temporal?.due_date && (
           <span className="todo-today-tag">Today</span>
         )}
       </div>
