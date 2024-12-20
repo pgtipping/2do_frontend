@@ -47,7 +47,6 @@ export class NLPTaskParser {
     }
   }
 }
-
 // Example usage:
 // const parser = new NLPTaskParser('your-api-key');
 // const taskDetails = await parser.parseTask("Finish the report by next Friday");

@@ -2,7 +2,7 @@
 export function calculateSimilarity(str1, str2) {
   const s1 = str1.toLowerCase();
   const s2 = str2.toLowerCase();
-  
+
   const costs = [];
   for (let i = 0; i <= s1.length; i++) {
     let lastValue = i;
@@ -22,17 +22,21 @@ export function calculateSimilarity(str1, str2) {
       costs[s2.length] = lastValue;
     }
   }
-  
+
   const maxLength = Math.max(s1.length, s2.length);
   const similarity = (maxLength - costs[s2.length]) / maxLength;
   return similarity;
 }
 
-export function findSimilarCategories(newCategory, existingCategories, threshold = 0.7) {
+export function findSimilarCategories(
+  newCategory,
+  existingCategories,
+  threshold = 0.7
+) {
   return existingCategories
-    .map(category => ({
+    .map((category) => ({
       category,
-      similarity: calculateSimilarity(newCategory, category)
+      similarity: calculateSimilarity(newCategory, category),
     }))
     .filter(({ similarity }) => similarity > threshold)
     .sort((a, b) => b.similarity - a.similarity);

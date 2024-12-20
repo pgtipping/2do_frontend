@@ -97,6 +97,18 @@ export function NotificationProvider({ children }) {
     }
   };
 
+  const showNotification = (message, type) => {
+    const notification = {
+      id: Date.now(),
+      message,
+      type,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+    };
+    setNotifications((prev) => [notification, ...prev]);
+    setUnreadCount((prev) => prev + 1);
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -104,6 +116,7 @@ export function NotificationProvider({ children }) {
         unreadCount,
         markAsRead,
         clearNotifications,
+        showNotification,
       }}
     >
       {children}

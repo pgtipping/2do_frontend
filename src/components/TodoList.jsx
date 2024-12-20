@@ -34,6 +34,7 @@ function TodoList({
   const [taskFeedback, setTaskFeedback] = useState(null);
   const [taskAnalysis, setTaskAnalysis] = useState(null);
   const [selectedVoice, setSelectedVoice] = useState(null);
+  const inputRef = useRef(null);
 
   const recurrenceOptions = [
     { value: "", label: "Never" },
@@ -440,7 +441,7 @@ function TodoList({
               tasks: {
                 recent: todos.slice(-5),
                 similar: findRelatedTasks(todos, input),
-                today: todos.filter((t) => t.isToday),
+                today: todos.filter((t) => t.metadata?.isToday),
                 category: todos.filter((t) => t.category === filter).slice(-3),
                 patterns: {
                   common_times: getCommonTaskTimes(todos),
@@ -563,9 +564,29 @@ function TodoList({
 
   // Handle answering clarifying questions
   const handleAnswerQuestion = async (question, answer) => {
-    const updatedInput = `${newTask} - ${question}: ${answer}`;
-    setNewTask(updatedInput);
-    await parseTask(updatedInput);
+    if (question === "update" && answer === "now") {
+      // Just focus the input field
+      inputRef.current?.focus();
+
+      // Show guidance feedback
+      provideFeedback(
+        {
+          voice: "Please enter your updates and press Enter when ready",
+          display: "Enter your updates",
+          type: "info",
+          requiresAttention: true,
+        },
+        {
+          suggestions: taskAnalysis?.suggestions || [],
+          missing_info: taskAnalysis?.missing_info || [],
+        }
+      );
+    } else {
+      // Handle other clarifying questions
+      const updatedInput = `${newTask} - ${question}: ${answer}`;
+      setNewTask(updatedInput);
+      await parseTask(updatedInput);
+    }
   };
 
   // Add notification handling
@@ -724,11 +745,13 @@ function TodoList({
         filtered = taskList.filter((todo) => todo.completed);
         break;
       case "important":
-        filtered = taskList.filter((todo) => todo.important);
+        filtered = taskList.filter((todo) => todo.metadata?.isImportant);
         break;
       default:
         // Filter by category
-        filtered = taskList.filter((todo) => todo.category === filter);
+        filtered = taskList.filter(
+          (todo) => todo.metadata?.category === filter
+        );
     }
 
     setFilteredTodos(filtered);
@@ -772,6 +795,7 @@ function TodoList({
               onKeyPress={handleKeyPress}
               disabled={isProcessing || isListening}
               autoFocus
+              ref={inputRef}
             />
             <button
               className={`voice-input-button ${isListening ? "listening" : ""}`}
