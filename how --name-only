@@ -1,0 +1,451 @@
+[33mcommit 749f0bb03ca4cae7a15c97064d4f45f7765eeb5f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Pascal George <tamunoemi@gmail.com>
+Date:   Tue Dec 24 06:22:00 2024 -0500
+
+    Fix date setting functionality: - Implement proper date validation - Add DueDatDropdown and ReminderDropdown components - Fix temporal data handling - Add error notifications for invalid dates
+
+[1mdiff --git a/src/App.css b/src/App.css[m
+[1mindex 7ce0a4b..1feb3e5 100644[m
+[1m--- a/src/App.css[m
+[1m+++ b/src/App.css[m
+[36m@@ -300,6 +300,57 @@[m [mbody {[m
+   background-repeat: no-repeat;[m
+   background-position: right 8px center;[m
+   padding-right: 28px;[m
+[32m+[m[32m  width: 100%;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.repeat-select option,[m
+[32m+[m[32m.category-select option {[m
+[32m+[m[32m  padding: 8px 12px;[m
+[32m+[m[32m  font-size: 14px;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.repeat-select optgroup,[m
+[32m+[m[32m.category-select optgroup {[m
+[32m+[m[32m  font-size: 12px;[m
+[32m+[m[32m  color: var(--completed-color);[m
+[32m+[m[32m  font-weight: 600;[m
+[32m+[m[32m  padding: 4px 0;[m
+[32m+[m[32m  background-color: var(--background-color);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.repeat-select option,[m
+[32m+[m[32m.category-select option {[m
+[32m+[m[32m  background-color: white;[m
+[32m+[m[32m  color: var(--text-color);[m
+[32m+[m[32m  padding: 8px 12px;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.repeat-select option:hover,[m
+[32m+[m[32m.category-select option:hover {[m
+[32m+[m[32m  background-color: var(--hover-color);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.repeat-input,[m
+[32m+[m[32m.category-input {[m
+[32m+[m[32m  position: relative;[m
+[32m+[m[32m  display: flex;[m
+[32m+[m[32m  align-items: center;[m
+[32m+[m[32m  gap: 8px;[m
+[32m+[m[32m  padding: 8px 12px;[m
+[32m+[m[32m  background: var(--background-color);[m
+[32m+[m[32m  border: 1px solid var(--border-color);[m
+[32m+[m[32m  border-radius: 4px;[m
+[32m+[m[32m  cursor: pointer;[m
+[32m+[m[32m  transition: all 0.2s ease;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.repeat-input:hover,[m
+[32m+[m[32m.category-input:hover,[m
+[32m+[m[32m.repeat-input:focus-within,[m
+[32m+[m[32m.category-input:focus-within {[m
+[32m+[m[32m  background: white;[m
+[32m+[m[32m  border-color: var(--primary-color);[m
+[32m+[m[32m  box-shadow: 0 0 0 1px var(--primary-color);[m
+ }[m
+ [m
+ .calendar-icon,[m
+[1mdiff --git a/src/App.jsx b/src/App.jsx[m
+[1mindex deb7f8f..c1cb631 100644[m
+[1m--- a/src/App.jsx[m
+[1m+++ b/src/App.jsx[m
+[36m@@ -2,6 +2,8 @@[m [mimport React, { useState, useEffect } from "react";[m
+ import "./App.css";[m
+ import TodoList from "./components/TodoList";[m
+ import TaskInput from "./components/TaskInput";[m
+[32m+[m[32mimport DueDateDropdown from "./components/DueDateDropdown";[m
+[32m+[m[32mimport ReminderDropdown from "./components/ReminderDropdown";[m
+ import { fetchTodos, createTodo, updateTodo, deleteTodo } from "./utils/api";[m
+ import { useNotifications } from "./contexts/NotificationContext";[m
+ import { v4 as uuidv4 } from "uuid";[m
+[36m@@ -193,11 +195,25 @@[m [mfunction App() {[m
+   const handleDueDateChange = async (date) => {[m
+     if (!selectedTask) return;[m
+     try {[m
+[32m+[m[32m      // Validate date is not in the past[m
+[32m+[m[32m      const selectedDate = new Date(date);[m
+[32m+[m[32m      const now = new Date();[m
+[32m+[m[32m      if (selectedDate < now) {[m
+[32m+[m[32m        showNotification("Due date cannot be in the past", "error");[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Validate date is valid[m
+[32m+[m[32m      if (isNaN(selectedDate.getTime())) {[m
+[32m+[m[32m        showNotification("Invalid date format", "error");[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+       const updatedTask = {[m
+         ...selectedTask,[m
+         temporal: {[m
+           ...selectedTask.temporal,[m
+[31m-          due_date: date ? date.toISOString() : null,[m
+[32m+[m[32m          due_date: selectedDate.toISOString(),[m
+         },[m
+       };[m
+       await updateTask(updatedTask);[m
+[36m@@ -211,11 +227,34 @@[m [mfunction App() {[m
+   const handleReminderChange = async (date) => {[m
+     if (!selectedTask) return;[m
+     try {[m
+[32m+[m[32m      // Validate date is not in the past[m
+[32m+[m[32m      const selectedDate = new Date(date);[m
+[32m+[m[32m      const now = new Date();[m
+[32m+[m[32m      if (selectedDate < now) {[m
+[32m+[m[32m        showNotification("Reminder cannot be in the past", "error");[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Validate date is valid[m
+[32m+[m[32m      if (isNaN(selectedDate.getTime())) {[m
+[32m+[m[32m        showNotification("Invalid date format", "error");[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Validate reminder is not after due date[m
+[32m+[m[32m      if ([m
+[32m+[m[32m        selectedTask.temporal?.due_date &&[m
+[32m+[m[32m        selectedDate > new Date(selectedTask.temporal.due_date)[m
+[32m+[m[32m      ) {[m
+[32m+[m[32m        showNotification("Reminder cannot be after due date", "error");[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+       const updatedTask = {[m
+         ...selectedTask,[m
+         temporal: {[m
+           ...selectedTask.temporal,[m
+[31m-          reminder: date ? date.toISOString() : null,[m
+[32m+[m[32m          reminder: selectedDate.toISOString(),[m
+         },[m
+       };[m
+       await updateTask(updatedTask);[m
+[36m@@ -229,11 +268,35 @@[m [mfunction App() {[m
+   const handleRecurrenceChange = async (recurrence) => {[m
+     if (!selectedTask) return;[m
+     try {[m
+[32m+[m[32m      // Validate recurrence pattern[m
+[32m+[m[32m      const validPatterns = [[m
+[32m+[m[32m        "DAILY",[m
+[32m+[m[32m        "WEEKDAYS",[m
+[32m+[m[32m        "WEEKLY",[m
+[32m+[m[32m        "MONTHLY",[m
+[32m+[m[32m        "MONDAY",[m
+[32m+[m[32m        "TUESDAY",[m
+[32m+[m[32m        "WEDNESDAY",[m
+[32m+[m[32m        "THURSDAY",[m
+[32m+[m[32m        "FRIDAY",[m
+[32m+[m[32m        "SATURDAY",[m
+[32m+[m[32m        "SUNDAY",[m
+[32m+[m[32m        "BIWEEKLY",[m
+[32m+[m[32m        "QUARTERLY",[m
+[32m+[m[32m        "YEARLY",[m
+[32m+[m[32m        "",[m
+[32m+[m[32m      ];[m
+[32m+[m
+[32m+[m[32m      if (!validPatterns.includes(recurrence)) {[m
+[32m+[m[32m        showNotification("Invalid recurrence pattern", "error");[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+       const updatedTask = {[m
+         ...selectedTask,[m
+         temporal: {[m
+           ...selectedTask.temporal,[m
+[31m-          recurrence,[m
+[32m+[m[32m          recurrence: recurrence || null,[m
+         },[m
+       };[m
+       await updateTask(updatedTask);[m
+[36m@@ -376,60 +439,20 @@[m [mfunction App() {[m
+               </button>[m
+             </div>[m
+             <div className="task-details-section">[m
+[31m-              <div className="due-date-dropdown">[m
+[31m-                <div[m
+[31m-                  className="due-date-input"[m
+[31m-                  onClick={() =>[m
+[31m-                    document.getElementById("due-date-picker").showPicker()[m
+[31m-                  }[m
+[31m-                >[m
+[31m-                  <span className="calendar-icon">📅</span>[m
+[31m-                  <span>[m
+[31m-                    {selectedTask.temporal?.due_date[m
+[31m-                      ? formatDateTime(selectedTask.temporal.due_date)[m
+[31m-                      : "Add due date"}[m
+[31m-                  </span>[m
+[31m-                </div>[m
+[31m-                <input[m
+[31m-                  type="datetime-local"[m
+[31m-                  id="due-date-picker"[m
+[31m-                  className="date-picker"[m
+[31m-                  value={selectedTask.temporal?.due_date?.slice(0, 16) || ""}[m
+[31m-                  onChange={(e) =>[m
+[31m-                    handleDueDateChange([m
+[31m-                      e.target.value ? new Date(e.target.value) : null[m
+[31m-                    )[m
+[31m-                  }[m
+[31m-                />[m
+[31m-              </div>[m
+[32m+[m[32m              <DueDateDropdown[m
+[32m+[m[32m                value={selectedTask.temporal?.due_date || selectedTask.due_date}[m
+[32m+[m[32m                onChange={handleDueDateChange}[m
+[32m+[m[32m                isOverdue={[m
+[32m+[m[32m                  selectedTask.temporal?.due_date &&[m
+[32m+[m[32m                  new Date(selectedTask.temporal.due_date) < new Date()[m
+[32m+[m[32m                }[m
+[32m+[m[32m              />[m
+             </div>[m
+             <div className="task-details-section">[m
+[31m-              <div className="reminder-dropdown">[m
+[31m-                <div[m
+[31m-                  className="reminder-input"[m
+[31m-                  onClick={() =>[m
+[31m-                    document.getElementById("reminder-picker").showPicker()[m
+[31m-                  }[m
+[31m-                >[m
+[31m-                  <span className="reminder-bell">🔔</span>[m
+[31m-                  <span>[m
+[31m-                    {selectedTask.temporal?.reminder[m
+[31m-                      ? formatDateTime(selectedTask.temporal.reminder)[m
+[31m-                      : "Remind me"}[m
+[31m-                  </span>[m
+[31m-                </div>[m
+[31m-                <input[m
+[31m-                  type="datetime-local"[m
+[31m-                  id="reminder-picker"[m
+[31m-                  className="date-picker"[m
+[31m-                  value={selectedTask.temporal?.reminder?.slice(0, 16) || ""}[m
+[31m-                  onChange={(e) =>[m
+[31m-                    handleReminderChange([m
+[31m-                      e.target.value ? new Date(e.target.value) : null[m
+[31m-                    )[m
+[31m-                  }[m
+[31m-                />[m
+[31m-              </div>[m
+[32m+[m[32m              <ReminderDropdown[m
+[32m+[m[32m                value={selectedTask.temporal?.reminder || selectedTask.reminder}[m
+[32m+[m[32m                onChange={handleReminderChange}[m
+[32m+[m[32m              />[m
+             </div>[m
+             <div className="task-details-section">[m
+               <div className="repeat-dropdown">[m
+[36m@@ -437,14 +460,34 @@[m [mfunction App() {[m
+                   <span className="repeat-icon">🔄</span>[m
+                   <select[m
+                     className="repeat-select"[m
+[31m-                    value={selectedTask.temporal?.recurrence || ""}[m
+[32m+[m[32m                    value={[m
+[32m+[m[32m                      selectedTask.temporal?.recurrence ||[m
+[32m+[m[32m                      selectedTask.recurrence ||[m
+[32m+[m[32m                      ""[m
+[32m+[m[32m                    }[m
+                     onChange={(e) => handleRecurrenceChange(e.target.value)}[m
+                   >[m
+                     <option value="">No repeat</option>[m
+[31m-                    <option value="DAILY">Daily</option>[m
+[31m-                    <option value="WEEKLY">Weekly</option>[m
+[31m-                    <option value="MONTHLY">Monthly</option>[m
+[31m-                    <option value="YEARLY">Yearly</option>[m
+[32m+[m[32m                    <optgroup label="Common">[m
+[32m+[m[32m                      <option value="DAILY">Every day</option>[m
+[32m+[m[32m                      <option value="WEEKDAYS">Every weekday</option>[m
+[32m+[m[32m                      <option value="WEEKLY">Every week</option>[m
+[32m+[m[32m                      <option value="MONTHLY">Every month</option>[m
+[32m+[m[32m                    </optgroup>[m
+[32m+[m[32m                    <optgroup label="Weekly">[m
+[32m+[m[32m                      <option value="MONDAY">Every Monday</option>[m
+[32m+[m[32m                      <option value="TUESDAY">Every Tuesday</option>[m
+[32m+[m[32m                      <option value="WEDNESDAY">Every Wednesday</option>[m
+[32m+[m[32m                      <option value="THURSDAY">Every Thursday</option>[m
+[32m+[m[32m                      <option value="FRIDAY">Every Friday</option>[m
+[32m+[m[32m                      <option value="SATURDAY">Every Saturday</option>[m
+[32m+[m[32m                      <option value="SUNDAY">Every Sunday</option>[m
+[32m+[m[32m                    </optgroup>[m
+[32m+[m[32m                    <optgroup label="Other">[m
+[32m+[m[32m                      <option value="BIWEEKLY">Every 2 weeks</option>[m
+[32m+[m[32m                      <option value="QUARTERLY">Every 3 months</option>[m
+[32m+[m[32m                      <option value="YEARLY">Every year</option>[m
+[32m+[m[32m                    </optgroup>[m
+                   </select>[m
+                 </div>[m
+               </div>[m
+[36m@@ -459,11 +502,24 @@[m [mfunction App() {[m
+                     onChange={(e) => handleCategoryChange(e.target.value)}[m
+                   >[m
+                     <option value="">No category</option>[m
+[31m-                    <option value="WORK">Work</option>[m
+[31m-                    <option value="PERSONAL">Personal</option>[m
+[31m-                    <option value="SHOPPING">Shopping</option>[m
+[31m-                    <option value="HEALTH">Health</option>[m
+[31m-                    <option value="FINANCE">Finance</option>[m
+[32m+[m[32m                    <optgroup label="Work">[m
+[32m+[m[32m                      <option value="WORK_TASKS">📋 Tasks</option>[m
+[32m+[m[32m                      <option value="WORK_MEETINGS">👥 Meetings</option>[m
+[32m+[m[32m                      <option value="WORK_DEADLINES">⏰ Deadlines</option>[m
+[32m+[m[32m                      <option value="WORK_PROJECTS">📊 Projects</option>[m
+[32m+[m[32m                    </optgroup>[m
+[32m+[m[32m                    <optgroup label="Personal">[m
+[32m+[m[32m                      <option value="PERSONAL_TASKS">🏠 Tasks</option>[m
+[32m+[m[32m                      <option value="PERSONAL_HEALTH">❤️ Health</option>[m
+[32m+[m[32m                      <option value="PERSONAL_FINANCE">💰 Finance</option>[m
+[32m+[m[32m                      <option value="PERSONAL_SHOPPING">🛒 Shopping</option>[m
+[32m+[m[32m                    </optgroup>[m
+[32m+[m[32m                    <optgroup label="Other">[m
+[32m+[m[32m                      <option value="LEARNING">📚 Learning</option>[m
+[32m+[m[32m                      <option value="EVENTS">🎉 Events</option>[m
+[32m+[m[32m                      <option value="IDEAS">💡 Ideas</option>[m
+[32m+[m[32m                      <option value="SOMEDAY">🌟 Someday</option>[m
+[32m+[m[32m                    </optgroup>[m
+                   </select>[m
+                 </div>[m
+               </div>[m
+[1mdiff --git a/src/components/DueDateDropdown.jsx b/src/components/DueDateDropdown.jsx[m
+[1mindex f6715d9..5038305 100644[m
+[1m--- a/src/components/DueDateDropdown.jsx[m
+[1m+++ b/src/components/DueDateDropdown.jsx[m
+[36m@@ -37,13 +37,23 @@[m [mfunction DueDateDropdown({ value, onChange, isOverdue }) {[m
+   };[m
+ [m
+   const handleOptionClick = (date) => {[m
+[31m-    onChange(date);[m
+[32m+[m[32m    const selectedDate = new Date(date);[m
+[32m+[m[32m    if (isNaN(selectedDate.getTime())) {[m
+[32m+[m[32m      console.error("Invalid date selected");[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    selectedDate.setHours(0, 0, 0, 0);[m
+[32m+[m[32m    onChange(selectedDate.toISOString());[m
+     setIsOpen(false);[m
+   };[m
+ [m
+   const handleCustomDateClick = (e) => {[m
+     e.stopPropagation();[m
+     if (datePickerRef.current) {[m
+[32m+[m[32m      const today = new Date();[m
+[32m+[m[32m      today.setHours(0, 0, 0, 0);[m
+[32m+[m[32m      datePickerRef.current.min = today.toISOString().slice(0, 16);[m
+       datePickerRef.current.showPicker();[m
+     }[m
+   };[m
+[1mdiff --git a/src/components/ReminderDropdown.jsx b/src/components/ReminderDropdown.jsx[m
+[1mindex 80db4fa..e721d5e 100644[m
+[1m--- a/src/components/ReminderDropdown.jsx[m
+[1m+++ b/src/components/ReminderDropdown.jsx[m
+[36m@@ -40,13 +40,25 @@[m [mfunction ReminderDropdown({ value, onChange }) {[m
+   };[m
+ [m
+   const handleOptionClick = (date) => {[m
+[31m-    onChange(date);[m
+[32m+[m[32m    const selectedDate = new Date(date);[m
+[32m+[m[32m    if (isNaN(selectedDate.getTime())) {[m
+[32m+[m[32m      console.error("Invalid date selected");[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (selectedDate.getHours() === 0 && selectedDate.getMinutes() === 0) {[m
+[32m+[m[32m      selectedDate.setHours(9, 0, 0, 0);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    onChange(selectedDate.toISOString());[m
+     setIsOpen(false);[m
+   };[m
+ [m
+   const handleCustomDateClick = (e) => {[m
+     e.stopPropagation();[m
+     if (datePickerRef.current) {[m
+[32m+[m[32m      const now = new Date();[m
+[32m+[m[32m      datePickerRef.current.min = now.toISOString().slice(0, 16);[m
+       datePickerRef.current.showPicker();[m
+     }[m
+   };[m
+[1mdiff --git a/src/components/TodoList.css b/src/components/TodoList.css[m
+[1mindex ea2a590..4712f73 100644[m
+[1m--- a/src/components/TodoList.css[m
+[1m+++ b/src/components/TodoList.css[m
+[36m@@ -105,3 +105,18 @@[m
+   font-size: 13px;[m
+   color: var(--completed-color);[m
+ }[m
+[32m+[m
+[32m+[m[32m.todo-due-date {[m
+[32m+[m[32m  font-size: 12px;[m
+[32m+[m[32m  color: var(--completed-color);[m
+[32m+[m[32m  background-color: rgba(0, 0, 0, 0.04);[m
+[32m+[m[32m  padding: 2px 8px;[m
+[32m+[m[32m  border-radius: 10px;[m
+[32m+[m[32m  margin-right: 8px;[m
+[32m+[m[32m  white-space: nowrap;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.todo-item.completed .todo-due-date {[m
+[32m+[m[32m  opacity: 0.7;[m
+[32m+[m[32m  text-decoration: none;[m
+[32m+[m[32m}[m
+[1mdiff --git a/src/components/TodoList.jsx b/src/components/TodoList.jsx[m
+[1mindex cc7e377..a2ae6bd 100644[m
+[1m--- a/src/components/TodoList.jsx[m
+[1m+++ b/src/components/TodoList.jsx[m
+[36m@@ -46,6 +46,15 @@[m [mfunction TodoList({[m
+     },[m
+   };[m
+ [m
+[32m+[m[32m  const formatDate = (dateStr) => {[m
+[32m+[m[32m    const date = new Date(dateStr);[m
+[32m+[m[32m    return date.toLocaleDateString("en-US", {[m
+[32m+[m[32m      month: "numeric",[m
+[32m+[m[32m      day: "numeric",[m
+[32m+[m[32m      year: "numeric",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  };[m
+[32m+[m
+   return ([m
+     <motion.div[m
+       className="todo-list-container"[m
+[36m@@ -77,6 +86,11 @@[m [mfunction TodoList({[m
+               />[m
+               <span className="todo-title">{todo.title}</span>[m
+               <div className="todo-actions">[m
+[32m+[m[32m                {todo.temporal?.due_date && ([m
+[32m+[m[32m                  <span className="todo-due-date">[m
+[32m+[m[32m                    {formatDate(todo.temporal.due_date)}[m
+[32m+[m[32m                  </span>[m
+[32m+[m[32m                )}[m
+                 <button[m
+                   className={`todo-star ${[m
+                     todo.metadata?.isImportant ? "active" : ""[m
+[1mdiff --git a/src/utils/api.js b/src/utils/api.js[m
+[1mindex 4b8c5dd..5fb5fd8 100644[m
+[1m--- a/src/utils/api.js[m
+[1m+++ b/src/utils/api.js[m
+[36m@@ -34,17 +34,46 @@[m [mexport async function createTodo(task) {[m
+ [m
+ export async function updateTodo(task) {[m
+   try {[m
+[32m+[m[32m    // Handle both nested and unnested temporal data[m
+[32m+[m[32m    const temporalData = task.temporal || {[m
+[32m+[m[32m      due_date: task.due_date,[m
+[32m+[m[32m      start_da

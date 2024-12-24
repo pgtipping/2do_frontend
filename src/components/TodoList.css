@@ -5,6 +5,48 @@
   will-change: contents;
 }
 
+.todo-group {
+  margin-bottom: 32px;
+}
+
+.todo-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 16px;
+  padding: 8px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.group-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  color: var(--completed-color);
+}
+
+.group-arrow.collapsed {
+  transform: rotate(-90deg);
+}
+
+.group-title {
+  flex: 1;
+}
+
+.group-count {
+  font-size: 12px;
+  color: var(--completed-color);
+  background-color: rgba(0, 0, 0, 0.04);
+  padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 24px;
+  text-align: center;
+}
+
 .todo-item {
   background: white;
   border-radius: 8px;
@@ -39,9 +81,25 @@
 
 .todo-item-content {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.todo-main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0; /* Prevents flex item from overflowing */
+}
+
+.todo-header {
+  display: flex;
   align-items: center;
   gap: 12px;
-  will-change: transform;
+  width: 100%;
 }
 
 .todo-checkbox {
@@ -51,6 +109,7 @@
   border: 2px solid var(--border-color);
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .todo-checkbox:checked {
@@ -62,13 +121,20 @@
   flex: 1;
   font-size: 14px;
   color: var(--text-color);
+  margin-right: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .todo-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
-  opacity: 0;
+  opacity: 0.8;
   transition: opacity 0.2s ease;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .todo-item:hover .todo-actions {
@@ -100,10 +166,11 @@
 }
 
 .todo-description {
-  margin-top: 8px;
   margin-left: 30px;
   font-size: 13px;
   color: var(--completed-color);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .todo-due-date {
@@ -112,11 +179,35 @@
   background-color: rgba(0, 0, 0, 0.04);
   padding: 2px 8px;
   border-radius: 10px;
-  margin-right: 8px;
   white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.todo-due-date.overdue {
+  color: #f44336;
+  background-color: rgba(244, 67, 54, 0.1);
 }
 
 .todo-item.completed .todo-due-date {
   opacity: 0.7;
   text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  .todo-list-container {
+    padding: 16px;
+  }
+
+  .todo-item {
+    padding: 10px 12px;
+  }
+
+  .todo-title {
+    font-size: 13px;
+  }
+
+  .todo-due-date {
+    font-size: 11px;
+  }
 }
