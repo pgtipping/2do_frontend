@@ -300,6 +300,57 @@ body {
   background-repeat: no-repeat;
   background-position: right 8px center;
   padding-right: 28px;
+  width: 100%;
+}
+
+.repeat-select option,
+.category-select option {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.repeat-select optgroup,
+.category-select optgroup {
+  font-size: 12px;
+  color: var(--completed-color);
+  font-weight: 600;
+  padding: 4px 0;
+  background-color: var(--background-color);
+}
+
+.repeat-select option,
+.category-select option {
+  background-color: white;
+  color: var(--text-color);
+  padding: 8px 12px;
+}
+
+.repeat-select option:hover,
+.category-select option:hover {
+  background-color: var(--hover-color);
+}
+
+.repeat-input,
+.category-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.repeat-input:hover,
+.category-input:hover,
+.repeat-input:focus-within,
+.category-input:focus-within {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px var(--primary-color);
 }
 
 .calendar-icon,

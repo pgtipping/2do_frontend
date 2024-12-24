@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 import TodoList from "./components/TodoList";
 import TaskInput from "./components/TaskInput";
+import DueDateDropdown from "./components/DueDateDropdown";
+import ReminderDropdown from "./components/ReminderDropdown";
 import { fetchTodos, createTodo, updateTodo, deleteTodo } from "./utils/api";
 import { useNotifications } from "./contexts/NotificationContext";
 import { v4 as uuidv4 } from "uuid";
@@ -193,11 +195,25 @@ function App() {
   const handleDueDateChange = async (date) => {
     if (!selectedTask) return;
     try {
+      // Validate date is not in the past
+      const selectedDate = new Date(date);
+      const now = new Date();
+      if (selectedDate < now) {
+        showNotification("Due date cannot be in the past", "error");
+        return;
+      }
+
+      // Validate date is valid
+      if (isNaN(selectedDate.getTime())) {
+        showNotification("Invalid date format", "error");
+        return;
+      }
+
       const updatedTask = {
         ...selectedTask,
         temporal: {
           ...selectedTask.temporal,
-          due_date: date ? date.toISOString() : null,
+          due_date: selectedDate.toISOString(),
         },
       };
       await updateTask(updatedTask);
@@ -211,11 +227,34 @@ function App() {
   const handleReminderChange = async (date) => {
     if (!selectedTask) return;
     try {
+      // Validate date is not in the past
+      const selectedDate = new Date(date);
+      const now = new Date();
+      if (selectedDate < now) {
+        showNotification("Reminder cannot be in the past", "error");
+        return;
+      }
+
+      // Validate date is valid
+      if (isNaN(selectedDate.getTime())) {
+        showNotification("Invalid date format", "error");
+        return;
+      }
+
+      // Validate reminder is not after due date
+      if (
+        selectedTask.temporal?.due_date &&
+        selectedDate > new Date(selectedTask.temporal.due_date)
+      ) {
+        showNotification("Reminder cannot be after due date", "error");
+        return;
+      }
+
       const updatedTask = {
         ...selectedTask,
         temporal: {
           ...selectedTask.temporal,
-          reminder: date ? date.toISOString() : null,
+          reminder: selectedDate.toISOString(),
         },
       };
       await updateTask(updatedTask);
@@ -229,11 +268,35 @@ function App() {
   const handleRecurrenceChange = async (recurrence) => {
     if (!selectedTask) return;
     try {
+      // Validate recurrence pattern
+      const validPatterns = [
+        "DAILY",
+        "WEEKDAYS",
+        "WEEKLY",
+        "MONTHLY",
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+        "SUNDAY",
+        "BIWEEKLY",
+        "QUARTERLY",
+        "YEARLY",
+        "",
+      ];
+
+      if (!validPatterns.includes(recurrence)) {
+        showNotification("Invalid recurrence pattern", "error");
+        return;
+      }
+
       const updatedTask = {
         ...selectedTask,
         temporal: {
           ...selectedTask.temporal,
-          recurrence,
+          recurrence: recurrence || null,
         },
       };
       await updateTask(updatedTask);
@@ -376,60 +439,20 @@ function App() {
               </button>
             </div>
             <div className="task-details-section">
-              <div className="due-date-dropdown">
-                <div
-                  className="due-date-input"
-                  onClick={() =>
-                    document.getElementById("due-date-picker").showPicker()
-                  }
-                >
-                  <span className="calendar-icon">📅</span>
-                  <span>
-                    {selectedTask.temporal?.due_date
-                      ? formatDateTime(selectedTask.temporal.due_date)
-                      : "Add due date"}
-                  </span>
-                </div>
-                <input
-                  type="datetime-local"
-                  id="due-date-picker"
-                  className="date-picker"
-                  value={selectedTask.temporal?.due_date?.slice(0, 16) || ""}
-                  onChange={(e) =>
-                    handleDueDateChange(
-                      e.target.value ? new Date(e.target.value) : null
-                    )
-                  }
-                />
-              </div>
+              <DueDateDropdown
+                value={selectedTask.temporal?.due_date || selectedTask.due_date}
+                onChange={handleDueDateChange}
+                isOverdue={
+                  selectedTask.temporal?.due_date &&
+                  new Date(selectedTask.temporal.due_date) < new Date()
+                }
+              />
             </div>
             <div className="task-details-section">
-              <div className="reminder-dropdown">
-                <div
-                  className="reminder-input"
-                  onClick={() =>
-                    document.getElementById("reminder-picker").showPicker()
-                  }
-                >
-                  <span className="reminder-bell">🔔</span>
-                  <span>
-                    {selectedTask.temporal?.reminder
-                      ? formatDateTime(selectedTask.temporal.reminder)
-                      : "Remind me"}
-                  </span>
-                </div>
-                <input
-                  type="datetime-local"
-                  id="reminder-picker"
-                  className="date-picker"
-                  value={selectedTask.temporal?.reminder?.slice(0, 16) || ""}
-                  onChange={(e) =>
-                    handleReminderChange(
-                      e.target.value ? new Date(e.target.value) : null
-                    )
-                  }
-                />
-              </div>
+              <ReminderDropdown
+                value={selectedTask.temporal?.reminder || selectedTask.reminder}
+                onChange={handleReminderChange}
+              />
             </div>
             <div className="task-details-section">
               <div className="repeat-dropdown">
@@ -437,14 +460,34 @@ function App() {
                   <span className="repeat-icon">🔄</span>
                   <select
                     className="repeat-select"
-                    value={selectedTask.temporal?.recurrence || ""}
+                    value={
+                      selectedTask.temporal?.recurrence ||
+                      selectedTask.recurrence ||
+                      ""
+                    }
                     onChange={(e) => handleRecurrenceChange(e.target.value)}
                   >
                     <option value="">No repeat</option>
-                    <option value="DAILY">Daily</option>
-                    <option value="WEEKLY">Weekly</option>
-                    <option value="MONTHLY">Monthly</option>
-                    <option value="YEARLY">Yearly</option>
+                    <optgroup label="Common">
+                      <option value="DAILY">Every day</option>
+                      <option value="WEEKDAYS">Every weekday</option>
+                      <option value="WEEKLY">Every week</option>
+                      <option value="MONTHLY">Every month</option>
+                    </optgroup>
+                    <optgroup label="Weekly">
+                      <option value="MONDAY">Every Monday</option>
+                      <option value="TUESDAY">Every Tuesday</option>
+                      <option value="WEDNESDAY">Every Wednesday</option>
+                      <option value="THURSDAY">Every Thursday</option>
+                      <option value="FRIDAY">Every Friday</option>
+                      <option value="SATURDAY">Every Saturday</option>
+                      <option value="SUNDAY">Every Sunday</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                      <option value="BIWEEKLY">Every 2 weeks</option>
+                      <option value="QUARTERLY">Every 3 months</option>
+                      <option value="YEARLY">Every year</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -459,11 +502,24 @@ function App() {
                     onChange={(e) => handleCategoryChange(e.target.value)}
                   >
                     <option value="">No category</option>
-                    <option value="WORK">Work</option>
-                    <option value="PERSONAL">Personal</option>
-                    <option value="SHOPPING">Shopping</option>
-                    <option value="HEALTH">Health</option>
-                    <option value="FINANCE">Finance</option>
+                    <optgroup label="Work">
+                      <option value="WORK_TASKS">📋 Tasks</option>
+                      <option value="WORK_MEETINGS">👥 Meetings</option>
+                      <option value="WORK_DEADLINES">⏰ Deadlines</option>
+                      <option value="WORK_PROJECTS">📊 Projects</option>
+                    </optgroup>
+                    <optgroup label="Personal">
+                      <option value="PERSONAL_TASKS">🏠 Tasks</option>
+                      <option value="PERSONAL_HEALTH">❤️ Health</option>
+                      <option value="PERSONAL_FINANCE">💰 Finance</option>
+                      <option value="PERSONAL_SHOPPING">🛒 Shopping</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                      <option value="LEARNING">📚 Learning</option>
+                      <option value="EVENTS">🎉 Events</option>
+                      <option value="IDEAS">💡 Ideas</option>
+                      <option value="SOMEDAY">🌟 Someday</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>

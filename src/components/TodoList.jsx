@@ -46,6 +46,15 @@ function TodoList({
     },
   };
 
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   return (
     <motion.div
       className="todo-list-container"
@@ -77,6 +86,11 @@ function TodoList({
               />
               <span className="todo-title">{todo.title}</span>
               <div className="todo-actions">
+                {todo.temporal?.due_date && (
+                  <span className="todo-due-date">
+                    {formatDate(todo.temporal.due_date)}
+                  </span>
+                )}
                 <button
                   className={`todo-star ${
                     todo.metadata?.isImportant ? "active" : ""

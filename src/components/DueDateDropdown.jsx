@@ -37,13 +37,23 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
   };
 
   const handleOptionClick = (date) => {
-    onChange(date);
+    const selectedDate = new Date(date);
+    if (isNaN(selectedDate.getTime())) {
+      console.error("Invalid date selected");
+      return;
+    }
+
+    selectedDate.setHours(0, 0, 0, 0);
+    onChange(selectedDate.toISOString());
     setIsOpen(false);
   };
 
   const handleCustomDateClick = (e) => {
     e.stopPropagation();
     if (datePickerRef.current) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      datePickerRef.current.min = today.toISOString().slice(0, 16);
       datePickerRef.current.showPicker();
     }
   };

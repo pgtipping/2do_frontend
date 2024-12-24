@@ -40,13 +40,25 @@ function ReminderDropdown({ value, onChange }) {
   };
 
   const handleOptionClick = (date) => {
-    onChange(date);
+    const selectedDate = new Date(date);
+    if (isNaN(selectedDate.getTime())) {
+      console.error("Invalid date selected");
+      return;
+    }
+
+    if (selectedDate.getHours() === 0 && selectedDate.getMinutes() === 0) {
+      selectedDate.setHours(9, 0, 0, 0);
+    }
+
+    onChange(selectedDate.toISOString());
     setIsOpen(false);
   };
 
   const handleCustomDateClick = (e) => {
     e.stopPropagation();
     if (datePickerRef.current) {
+      const now = new Date();
+      datePickerRef.current.min = now.toISOString().slice(0, 16);
       datePickerRef.current.showPicker();
     }
   };
