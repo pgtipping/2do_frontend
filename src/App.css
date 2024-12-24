@@ -173,7 +173,13 @@ body {
 
 .task-details-button:hover {
   background-color: var(--hover-color);
-  border-color: var(--completed-color);
+  border-color: var(--primary-color);
+}
+
+.task-details-button.active {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
 }
 
 .nav-item {
@@ -187,6 +193,8 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 14px;
+  position: relative;
+  overflow: hidden;
 }
 
 .nav-item:hover {
@@ -194,8 +202,19 @@ body {
 }
 
 .nav-item.active {
-  background-color: rgba(0, 0, 0, 0.08);
+  background-color: rgba(0, 120, 212, 0.1);
   font-weight: 500;
+  color: var(--primary-color);
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--primary-color);
 }
 
 .nav-item-icon {
@@ -206,6 +225,15 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 16px;
+  transition: transform 0.2s ease;
+}
+
+.nav-item:hover .nav-item-icon {
+  transform: scale(1.1);
+}
+
+.nav-item.active .nav-item-icon {
+  transform: scale(1.1);
 }
 
 .nav-item-count {
@@ -217,8 +245,67 @@ body {
   border-radius: 10px;
   min-width: 24px;
   text-align: center;
+  transition: all 0.2s ease;
 }
 
 .nav-item.active .nav-item-count {
-  background-color: rgba(0, 0, 0, 0.08);
+  background-color: rgba(0, 120, 212, 0.1);
+  color: var(--primary-color);
+}
+
+.date-picker {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.due-date-input,
+.reminder-input,
+.repeat-input,
+.category-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.due-date-input:hover,
+.reminder-input:hover,
+.repeat-input:hover,
+.category-input:hover {
+  background: white;
+  border-color: var(--primary-color);
+}
+
+.repeat-select,
+.category-select {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: var(--text-color);
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23605e5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.calendar-icon,
+.reminder-bell,
+.repeat-icon,
+.category-icon {
+  font-size: 16px;
+  color: var(--completed-color);
 }

@@ -40,6 +40,7 @@ function App() {
     } catch (error) {
       console.error("Error creating todo:", error);
       showNotification("Error creating task", "error");
+      return null;
     }
   };
 
@@ -129,21 +130,33 @@ function App() {
       await deleteTask(id);
     } catch (error) {
       console.error("Error deleting task:", error);
+      showNotification("Error deleting task", "error");
     }
   };
 
+  const handleFilterChange = (newFilter) => {
+    setFilter(newFilter);
+    setSelectedTask(null); // Clear selected task when changing filters
+  };
+
   const filteredTodos = todos.filter((todo) => {
-    if (filter === "completed") {
-      return todo.status === "COMPLETED";
-    }
-    if (filter === "important") {
-      return todo.metadata?.isImportant;
-    }
     const searchTerm = searchQuery.toLowerCase();
-    return (
+    const matchesSearch =
       todo.title.toLowerCase().includes(searchTerm) ||
-      todo.description?.toLowerCase().includes(searchTerm)
-    );
+      todo.description?.toLowerCase().includes(searchTerm);
+
+    if (!matchesSearch) return false;
+
+    switch (filter) {
+      case "completed":
+        return todo.status === "COMPLETED";
+      case "important":
+        return todo.metadata?.isImportant;
+      case "today":
+        return todo.metadata?.isToday;
+      default:
+        return true;
+    }
   });
 
   const formatDate = (date) => {
@@ -177,122 +190,297 @@ function App() {
       : `${formatDate(date)} @${formatTime(date)}`;
   };
 
+  const handleDueDateChange = async (date) => {
+    if (!selectedTask) return;
+    try {
+      const updatedTask = {
+        ...selectedTask,
+        temporal: {
+          ...selectedTask.temporal,
+          due_date: date ? date.toISOString() : null,
+        },
+      };
+      await updateTask(updatedTask);
+      showNotification("Due date updated", "success");
+    } catch (error) {
+      console.error("Error updating due date:", error);
+      showNotification("Error updating due date", "error");
+    }
+  };
+
+  const handleReminderChange = async (date) => {
+    if (!selectedTask) return;
+    try {
+      const updatedTask = {
+        ...selectedTask,
+        temporal: {
+          ...selectedTask.temporal,
+          reminder: date ? date.toISOString() : null,
+        },
+      };
+      await updateTask(updatedTask);
+      showNotification("Reminder updated", "success");
+    } catch (error) {
+      console.error("Error updating reminder:", error);
+      showNotification("Error updating reminder", "error");
+    }
+  };
+
+  const handleRecurrenceChange = async (recurrence) => {
+    if (!selectedTask) return;
+    try {
+      const updatedTask = {
+        ...selectedTask,
+        temporal: {
+          ...selectedTask.temporal,
+          recurrence,
+        },
+      };
+      await updateTask(updatedTask);
+      showNotification("Recurrence updated", "success");
+    } catch (error) {
+      console.error("Error updating recurrence:", error);
+      showNotification("Error updating recurrence", "error");
+    }
+  };
+
+  const handleCategoryChange = async (category) => {
+    if (!selectedTask) return;
+    try {
+      const updatedTask = {
+        ...selectedTask,
+        metadata: {
+          ...selectedTask.metadata,
+          category,
+        },
+      };
+      await updateTask(updatedTask);
+      showNotification("Category updated", "success");
+    } catch (error) {
+      console.error("Error updating category:", error);
+      showNotification("Error updating category", "error");
+    }
+  };
+
+  const toggleAddToToday = async () => {
+    if (!selectedTask) return;
+    try {
+      const updatedTask = {
+        ...selectedTask,
+        metadata: {
+          ...selectedTask.metadata,
+          isToday: !selectedTask.metadata?.isToday,
+        },
+      };
+      await updateTask(updatedTask);
+      showNotification(
+        `Task ${
+          updatedTask.metadata.isToday ? "added to" : "removed from"
+        } Today`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Error updating Today status:", error);
+      showNotification("Error updating Today status", "error");
+    }
+  };
+
   return (
-    <div className="app-container">
+    <div className="app">
+      <nav className="sidebar">
+        <div
+          className={`nav-item ${filter === "all" ? "active" : ""}`}
+          onClick={() => handleFilterChange("all")}
+        >
+          <span className="nav-item-icon">📝</span>
+          <span>All Tasks</span>
+          <span className="nav-item-count">{todos.length}</span>
+        </div>
+        <div
+          className={`nav-item ${filter === "today" ? "active" : ""}`}
+          onClick={() => handleFilterChange("today")}
+        >
+          <span className="nav-item-icon">📅</span>
+          <span>Today</span>
+          <span className="nav-item-count">
+            {todos.filter((t) => t.metadata?.isToday).length}
+          </span>
+        </div>
+        <div
+          className={`nav-item ${filter === "important" ? "active" : ""}`}
+          onClick={() => handleFilterChange("important")}
+        >
+          <span className="nav-item-icon">⭐</span>
+          <span>Important</span>
+          <span className="nav-item-count">
+            {todos.filter((t) => t.metadata?.isImportant).length}
+          </span>
+        </div>
+        <div
+          className={`nav-item ${filter === "completed" ? "active" : ""}`}
+          onClick={() => handleFilterChange("completed")}
+        >
+          <span className="nav-item-icon">✅</span>
+          <span>Completed</span>
+          <span className="nav-item-count">
+            {todos.filter((t) => t.status === "COMPLETED").length}
+          </span>
+        </div>
+      </nav>
+
       <main className="main-content">
-        <div className="task-list-container">
-          <div className="filter-bar">
-            <button
-              onClick={() => setFilter("all")}
-              className={filter === "all" ? "active" : ""}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setFilter("completed")}
-              className={filter === "completed" ? "active" : ""}
-            >
-              Completed
-            </button>
-            <button
-              onClick={() => setFilter("important")}
-              className={filter === "important" ? "active" : ""}
-            >
-              Important
-            </button>
-          </div>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search tasks"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+        <header className="header">
+          <h1>Tasks</h1>
+          <input
+            type="text"
+            className="search-bar"
+            placeholder="Search tasks"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </header>
+
+        <div className="todo-list">
           <TodoList
             todos={filteredTodos}
             toggleTodo={toggleTodo}
             toggleImportant={toggleImportant}
             onSelectTask={handleSelectTask}
-            onAddTodo={addTodo}
             onUpdateTask={updateTask}
             onDeleteTask={handleTaskModification}
-          />
-        </div>
-        <div className="task-input-container">
-          <TaskInput
-            onAddTodo={addTodo}
             selectedTask={selectedTask}
-            onUpdateTask={updateTask}
           />
+          <div className="task-input-container">
+            <TaskInput
+              onAddTodo={addTodo}
+              selectedTask={selectedTask}
+              onUpdateTask={updateTask}
+              todos={todos}
+            />
+          </div>
         </div>
       </main>
+
       {selectedTask && (
-        <aside className="task-details">
-          <div className="task-details-header">
-            <h2 className="task-details-title">{selectedTask.title}</h2>
-            <button
-              className={`task-details-star ${
-                selectedTask.metadata?.isImportant ? "active" : ""
-              }`}
-              onClick={() => toggleImportant(selectedTask.id)}
-            >
-              ⭐
-            </button>
-          </div>
-          <div className="task-details-section">
-            <div className="due-date-dropdown">
-              <div className="due-date-input">
-                <span className="calendar-icon">📅</span>
-                <span>
-                  {selectedTask.temporal?.due_date
-                    ? formatDateTime(selectedTask.temporal.due_date)
-                    : "Add due date"}
-                </span>
-              </div>
+        <aside className="right-panel">
+          <div className="task-details">
+            <div className="task-details-header">
+              <h2 className="task-details-title">{selectedTask.title}</h2>
+              <button
+                className={`task-details-star ${
+                  selectedTask.metadata?.isImportant ? "active" : ""
+                }`}
+                onClick={() => toggleImportant(selectedTask.id)}
+              >
+                ⭐
+              </button>
             </div>
-          </div>
-          <div className="task-details-section">
-            <div className="reminder-dropdown">
-              <div className="reminder-input">
-                <span className="reminder-bell">🔔</span>
-                <span>
-                  {selectedTask.temporal?.reminder
-                    ? formatDateTime(selectedTask.temporal.reminder)
-                    : "Remind me"}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="task-details-section">
-            <div className="repeat-dropdown">
-              <div className="repeat-input">
-                <span className="repeat-icon">🔄</span>
-                <div className="repeat-text">
-                  {selectedTask.temporal?.recurrence || "Repeat"}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="task-details-section">
-            <div className="category-dropdown">
-              <div className="category-input">
-                <span className="category-icon">🏷️</span>
-                <div className="selected-categories">
-                  <span className="category-placeholder">
-                    {selectedTask.metadata?.category || "Pick a category"}
+            <div className="task-details-section">
+              <div className="due-date-dropdown">
+                <div
+                  className="due-date-input"
+                  onClick={() =>
+                    document.getElementById("due-date-picker").showPicker()
+                  }
+                >
+                  <span className="calendar-icon">📅</span>
+                  <span>
+                    {selectedTask.temporal?.due_date
+                      ? formatDateTime(selectedTask.temporal.due_date)
+                      : "Add due date"}
                   </span>
                 </div>
+                <input
+                  type="datetime-local"
+                  id="due-date-picker"
+                  className="date-picker"
+                  value={selectedTask.temporal?.due_date?.slice(0, 16) || ""}
+                  onChange={(e) =>
+                    handleDueDateChange(
+                      e.target.value ? new Date(e.target.value) : null
+                    )
+                  }
+                />
               </div>
             </div>
-          </div>
-          <div className="task-details-section">
-            <div className="task-details-label">Add to Today</div>
-            <button className="task-details-button">
-              {selectedTask.metadata?.isToday
-                ? "Added to Today"
-                : "Add to Today"}
-            </button>
+            <div className="task-details-section">
+              <div className="reminder-dropdown">
+                <div
+                  className="reminder-input"
+                  onClick={() =>
+                    document.getElementById("reminder-picker").showPicker()
+                  }
+                >
+                  <span className="reminder-bell">🔔</span>
+                  <span>
+                    {selectedTask.temporal?.reminder
+                      ? formatDateTime(selectedTask.temporal.reminder)
+                      : "Remind me"}
+                  </span>
+                </div>
+                <input
+                  type="datetime-local"
+                  id="reminder-picker"
+                  className="date-picker"
+                  value={selectedTask.temporal?.reminder?.slice(0, 16) || ""}
+                  onChange={(e) =>
+                    handleReminderChange(
+                      e.target.value ? new Date(e.target.value) : null
+                    )
+                  }
+                />
+              </div>
+            </div>
+            <div className="task-details-section">
+              <div className="repeat-dropdown">
+                <div className="repeat-input">
+                  <span className="repeat-icon">🔄</span>
+                  <select
+                    className="repeat-select"
+                    value={selectedTask.temporal?.recurrence || ""}
+                    onChange={(e) => handleRecurrenceChange(e.target.value)}
+                  >
+                    <option value="">No repeat</option>
+                    <option value="DAILY">Daily</option>
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="YEARLY">Yearly</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="task-details-section">
+              <div className="category-dropdown">
+                <div className="category-input">
+                  <span className="category-icon">🏷️</span>
+                  <select
+                    className="category-select"
+                    value={selectedTask.metadata?.category || ""}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                  >
+                    <option value="">No category</option>
+                    <option value="WORK">Work</option>
+                    <option value="PERSONAL">Personal</option>
+                    <option value="SHOPPING">Shopping</option>
+                    <option value="HEALTH">Health</option>
+                    <option value="FINANCE">Finance</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="task-details-section">
+              <div className="task-details-label">Add to Today</div>
+              <button
+                className={`task-details-button ${
+                  selectedTask.metadata?.isToday ? "active" : ""
+                }`}
+                onClick={toggleAddToToday}
+              >
+                {selectedTask.metadata?.isToday
+                  ? "Added to Today"
+                  : "Add to Today"}
+              </button>
+            </div>
           </div>
         </aside>
       )}
