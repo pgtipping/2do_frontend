@@ -1,10 +1,51 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import "./ReminderDropdown.css";
+import TimePickerModal from "./TimePickerModal";
 
 function ReminderDropdown({ value, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [tempSelectedDate, setTempSelectedDate] = useState(null);
-  const datePickerRef = useRef(null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const weekDays = ["S", "M", "T", "W", "T", "F", "S"];
+
+  useEffect(() => {
+    if (isOpen && dropdownRef.current && inputRef.current) {
+      const inputRect = inputRef.current.getBoundingClientRect();
+      const dropdownRect = dropdownRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      // Calculate optimal position
+      let top = inputRect.bottom + 8; // Default to below input
+      let left = inputRect.left;
+
+      // Check if dropdown would go below viewport
+      if (top + dropdownRect.height > viewportHeight) {
+        // Position above input if there's more space there
+        top = inputRect.top - dropdownRect.height - 8;
+      }
+
+      // Ensure left position doesn't push dropdown off screen
+      if (left + dropdownRect.width > viewportWidth) {
+        left = viewportWidth - dropdownRect.width - 16;
+      }
+
+      // Ensure minimum spacing from edges
+      top = Math.max(
+        16,
+        Math.min(top, viewportHeight - dropdownRect.height - 16)
+      );
+      left = Math.max(16, left);
+
+      // Apply position
+      dropdownRef.current.style.top = `${top}px`;
+      dropdownRef.current.style.left = `${left}px`;
+    }
+  }, [isOpen]);
 
   const formatDate = (date) => {
     return date.toLocaleDateString("en-US", {
@@ -15,57 +56,93 @@ function ReminderDropdown({ value, onChange }) {
   };
 
   const formatTime = (date) => {
-    return date
-      .toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
-      .toLowerCase();
-  };
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "pm" : "am";
+    const displayHours = hours % 12 || 12;
 
-  const getNextWeekday = (dayOffset) => {
-    const date = new Date();
-    date.setDate(date.getDate() + dayOffset);
-    date.setHours(9, 0, 0, 0);
-    return date;
+    if (minutes === 0) {
+      return `@${displayHours}${ampm}`;
+    }
+    return `@${displayHours}:${minutes.toString().padStart(2, "0")}${ampm}`;
   };
 
   const formatReminderText = (dateStr) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
-    return {
-      time: "Remind me",
-      day: formatDate(date),
-    };
+    const today = new Date();
+    const isToday =
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+
+    if (isToday) {
+      return `Today ${formatTime(date)}`;
+    }
+
+    return `${formatDate(date)} ${formatTime(date)}`;
   };
 
-  const handleOptionClick = (date) => {
-    const selectedDate = new Date(date);
-    if (isNaN(selectedDate.getTime())) {
-      console.error("Invalid date selected");
-      return;
-    }
+  const getDaysInMonth = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
 
-    if (selectedDate.getHours() === 0 && selectedDate.getMinutes() === 0) {
-      selectedDate.setHours(9, 0, 0, 0);
-    }
-
-    setTempSelectedDate(selectedDate);
+    return { daysInMonth, startingDay };
   };
 
-  const handleCustomDateClick = (e) => {
-    e.stopPropagation();
-    if (datePickerRef.current) {
-      const now = new Date();
-      datePickerRef.current.min = now.toISOString().slice(0, 16);
-      datePickerRef.current.showPicker();
+  const handlePrevMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
+    );
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
+    );
+  };
+
+  const handleDateSelect = (day) => {
+    const selected = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day
+    );
+
+    // Preserve existing time or use current time
+    const timeToUse = value ? new Date(value) : new Date();
+    selected.setHours(timeToUse.getHours(), timeToUse.getMinutes(), 0, 0);
+    setTempSelectedDate(selected);
+  };
+
+  const handleTimeSelect = (time) => {
+    if (value) {
+      // If we have an existing date, update its time
+      const existingDate = new Date(value);
+      existingDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      onChange(existingDate.toISOString());
+    } else if (tempSelectedDate) {
+      // If we have a temp selected date but no saved date, update temp
+      const newDate = new Date(tempSelectedDate);
+      newDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      setTempSelectedDate(newDate);
+    } else {
+      // If no date is selected, use today with selected time
+      const today = new Date();
+      today.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      onChange(today.toISOString());
     }
+    setShowTimePicker(false);
   };
 
   const handleConfirm = () => {
     if (tempSelectedDate) {
       onChange(tempSelectedDate.toISOString());
+      setTempSelectedDate(null);
     }
     setIsOpen(false);
   };
@@ -75,71 +152,105 @@ function ReminderDropdown({ value, onChange }) {
     setIsOpen(false);
   };
 
+  const renderCalendar = () => {
+    const { daysInMonth, startingDay } = getDaysInMonth(currentMonth);
+    const today = new Date();
+    const days = [];
+
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDay; i++) {
+      days.push(
+        <div key={`empty-${i}`} className="calendar-day other-month"></div>
+      );
+    }
+
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(
+        currentMonth.getFullYear(),
+        currentMonth.getMonth(),
+        day
+      );
+      const isToday = date.toDateString() === today.toDateString();
+      const isSelected =
+        tempSelectedDate &&
+        date.toDateString() === tempSelectedDate.toDateString();
+      const isPast = date < today;
+
+      days.push(
+        <div
+          key={day}
+          className={`calendar-day ${isToday ? "today" : ""} ${
+            isSelected ? "selected" : ""
+          } ${isPast ? "disabled" : ""}`}
+          onClick={() => !isPast && handleDateSelect(day)}
+        >
+          {day}
+        </div>
+      );
+    }
+
+    return days;
+  };
+
   const reminderText = value ? formatReminderText(value) : null;
-  const tomorrow = getNextWeekday(1);
-  const nextWeek = getNextWeekday(7);
 
   return (
     <div className="reminder-dropdown">
-      <div className="reminder-input" onClick={() => setIsOpen(!isOpen)}>
-        <span className="reminder-bell">🔔</span>
+      <div
+        ref={inputRef}
+        className="reminder-input"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="reminder-icon">🔔</span>
         {reminderText ? (
-          <div className="selected-reminder">
-            <div className="reminder-time">{reminderText.time}</div>
-            <div className="reminder-day">{reminderText.day}</div>
+          <div className="reminder-text">
+            <span>Remind me </span>
+            <span>{reminderText}</span>
           </div>
         ) : (
-          <span>Remind me</span>
+          <span>Add reminder</span>
         )}
       </div>
       {isOpen && (
-        <div className="reminder-options">
-          <div className="reminder-header">Reminder</div>
-          <div
-            className={`reminder-option ${
-              tempSelectedDate?.getTime() === getNextWeekday(0).getTime()
-                ? "selected"
-                : ""
-            }`}
-            onClick={() => handleOptionClick(getNextWeekday(0))}
-          >
-            <span className="time-icon">⏰</span>
-            Later today
+        <div ref={dropdownRef} className="reminder-options">
+          <div className="reminder-header">Set reminder</div>
+          <div className="calendar-header">
+            <div className="month-year-selector">
+              {currentMonth.toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+              })}
+            </div>
+            <div className="calendar-nav">
+              <button className="nav-arrow" onClick={handlePrevMonth}>
+                ←
+              </button>
+              <button className="nav-arrow" onClick={handleNextMonth}>
+                →
+              </button>
+            </div>
           </div>
-          <div
-            className={`reminder-option ${
-              tempSelectedDate?.getTime() === tomorrow.getTime()
-                ? "selected"
-                : ""
-            }`}
-            onClick={() => handleOptionClick(tomorrow)}
-          >
-            <span className="time-icon">⏰</span>
-            Tomorrow
-            <span className="time-detail">{formatDate(tomorrow)}</span>
+          <div className="calendar-grid">
+            {weekDays.map((day) => (
+              <div key={day} className="weekday-header">
+                {day}
+              </div>
+            ))}
+            {renderCalendar()}
           </div>
-          <div
-            className={`reminder-option ${
-              tempSelectedDate?.getTime() === nextWeek.getTime()
-                ? "selected"
-                : ""
-            }`}
-            onClick={() => handleOptionClick(nextWeek)}
-          >
-            <span className="time-icon">⏰</span>
-            Next week
-            <span className="time-detail">{formatDate(nextWeek)}</span>
-          </div>
-          <div className="reminder-option custom-date">
-            <span className="calendar-icon">📅</span>
-            <span onClick={handleCustomDateClick}>Pick a date & time</span>
-            <input
-              ref={datePickerRef}
-              type="datetime-local"
-              className="hidden-datetime-input"
-              onChange={(e) => handleOptionClick(new Date(e.target.value))}
-              onClick={(e) => e.stopPropagation()}
-            />
+          <div className="custom-date">
+            <div
+              className="reminder-option"
+              onClick={() => setShowTimePicker(true)}
+            >
+              <span className="reminder-icon">⏰</span>
+              <span>
+                {tempSelectedDate
+                  ? formatTime(tempSelectedDate)
+                  : "Pick a time"}
+              </span>
+            </div>
           </div>
           <div className="reminder-actions">
             <button
@@ -155,6 +266,15 @@ function ReminderDropdown({ value, onChange }) {
               OK
             </button>
           </div>
+        </div>
+      )}
+      {showTimePicker && (
+        <div className="time-picker-overlay">
+          <TimePickerModal
+            initialTime={tempSelectedDate || new Date()}
+            onConfirm={handleTimeSelect}
+            onCancel={() => setShowTimePicker(false)}
+          />
         </div>
       )}
     </div>

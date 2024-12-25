@@ -141,6 +141,21 @@ function App() {
     setSelectedTask(null); // Clear selected task when changing filters
   };
 
+  // Helper function to check if a task is due today
+  const isTaskDueToday = (task) => {
+    const dueDate = task.temporal?.due_date || task.due_date;
+    if (!dueDate) return false;
+
+    const taskDate = new Date(dueDate);
+    const today = new Date();
+
+    return (
+      taskDate.getDate() === today.getDate() &&
+      taskDate.getMonth() === today.getMonth() &&
+      taskDate.getFullYear() === today.getFullYear()
+    );
+  };
+
   const filteredTodos = todos.filter((todo) => {
     const searchTerm = searchQuery.toLowerCase();
     const matchesSearch =
@@ -155,7 +170,7 @@ function App() {
       case "important":
         return todo.metadata?.isImportant;
       case "today":
-        return todo.metadata?.isToday;
+        return isTaskDueToday(todo);
       default:
         return true;
     }
@@ -210,11 +225,22 @@ function App() {
         return;
       }
 
+      // Check if the selected date is today
+      const today = new Date();
+      const isToday =
+        selectedDate.getDate() === today.getDate() &&
+        selectedDate.getMonth() === today.getMonth() &&
+        selectedDate.getFullYear() === today.getFullYear();
+
       const updatedTask = {
         ...selectedTask,
         temporal: {
           ...selectedTask.temporal,
-          due_date: date, // Use the original ISO string to preserve exact time
+          due_date: date,
+        },
+        metadata: {
+          ...selectedTask.metadata,
+          isToday: isToday || selectedTask.metadata?.isToday || false,
         },
       };
       await updateTask(updatedTask);
@@ -329,18 +355,42 @@ function App() {
   const toggleAddToToday = async () => {
     if (!selectedTask) return;
     try {
+      let newDueDate = null;
+
+      if (!isTaskDueToday(selectedTask)) {
+        const today = new Date();
+
+        // Extract time from any existing due date
+        let hours = 9; // default
+        let minutes = 0;
+
+        const existingDueDate = selectedTask.temporal?.due_date;
+        if (existingDueDate) {
+          const existingDate = new Date(existingDueDate);
+          hours = existingDate.getHours();
+          minutes = existingDate.getMinutes();
+        }
+
+        // Set the time
+        today.setHours(hours);
+        today.setMinutes(minutes);
+        today.setSeconds(0);
+        today.setMilliseconds(0);
+
+        newDueDate = today.toISOString();
+      }
+
       const updatedTask = {
         ...selectedTask,
-        metadata: {
-          ...selectedTask.metadata,
-          isToday: !selectedTask.metadata?.isToday,
+        temporal: {
+          ...selectedTask.temporal,
+          due_date: newDueDate,
+          reminder: null, // Clear any reminders when moving to today
         },
       };
       await updateTask(updatedTask);
       showNotification(
-        `Task ${
-          updatedTask.metadata.isToday ? "added to" : "removed from"
-        } Today`,
+        `Task ${newDueDate ? "added to" : "removed from"} Today`,
         "success"
       );
     } catch (error) {
@@ -367,7 +417,7 @@ function App() {
           <span className="nav-item-icon">📅</span>
           <span>Today</span>
           <span className="nav-item-count">
-            {todos.filter((t) => t.metadata?.isToday).length}
+            {todos.filter(isTaskDueToday).length}
           </span>
         </div>
         <div
@@ -526,14 +576,13 @@ function App() {
               </div>
             </div>
             <div className="task-details-section">
-              <div className="task-details-label">Add to Today</div>
               <button
                 className={`task-details-button ${
-                  selectedTask.metadata?.isToday ? "active" : ""
+                  isTaskDueToday(selectedTask) ? "active" : ""
                 }`}
                 onClick={toggleAddToToday}
               >
-                {selectedTask.metadata?.isToday
+                {isTaskDueToday(selectedTask)
                   ? "Added to Today"
                   : "Add to Today"}
               </button>

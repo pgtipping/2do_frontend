@@ -1,10 +1,14 @@
 import React, { useState, useRef } from "react";
 import "./DueDateDropdown.css";
+import TimePickerModal from "./TimePickerModal";
 
 function DueDateDropdown({ value, onChange, isOverdue }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [tempSelectedDate, setTempSelectedDate] = useState(null);
-  const datePickerRef = useRef(null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  const weekDays = ["S", "M", "T", "W", "T", "F", "S"];
 
   const formatDate = (date) => {
     return date.toLocaleDateString("en-US", {
@@ -12,13 +16,6 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
       month: "long",
       day: "numeric",
     });
-  };
-
-  const getNextWeekday = (dayOffset) => {
-    const date = new Date();
-    date.setDate(date.getDate() + dayOffset);
-    date.setHours(9, 0, 0, 0);
-    return date;
   };
 
   const formatTime = (date) => {
@@ -49,60 +46,65 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
     return `${formatDate(date)} ${formatTime(date)}`;
   };
 
-  const handleOptionClick = (date, isCustomDateTime = false) => {
-    let selectedDate;
+  const getDaysInMonth = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
 
-    // Handle datetime-local input value
-    if (isCustomDateTime) {
-      // For datetime-local input, create date from the raw value
-      selectedDate = new Date(date);
-      if (isNaN(selectedDate.getTime())) {
-        console.error("Invalid date selected");
-        return;
-      }
-      // Preserve the exact time from the datetime picker
-      setTempSelectedDate(selectedDate);
-      return;
-    }
-
-    // Handle preset options
-    selectedDate = new Date(date);
-    if (isNaN(selectedDate.getTime())) {
-      console.error("Invalid date selected");
-      return;
-    }
-
-    // Set default time for preset options
-    selectedDate.setHours(9, 0, 0, 0);
-    setTempSelectedDate(selectedDate);
+    return { daysInMonth, startingDay };
   };
 
-  const handleCustomDateClick = (e) => {
-    e.stopPropagation();
-    if (datePickerRef.current) {
+  const handlePrevMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
+    );
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
+    );
+  };
+
+  const handleDateSelect = (day) => {
+    const selected = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day
+    );
+
+    // Preserve existing time or use current time
+    const timeToUse = value ? new Date(value) : new Date();
+    selected.setHours(timeToUse.getHours(), timeToUse.getMinutes(), 0, 0);
+    setTempSelectedDate(selected);
+  };
+
+  const handleTimeSelect = (time) => {
+    if (value) {
+      // If we have an existing date, update its time
+      const existingDate = new Date(value);
+      existingDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      onChange(existingDate.toISOString());
+    } else if (tempSelectedDate) {
+      // If we have a temp selected date but no saved date, update temp
+      const newDate = new Date(tempSelectedDate);
+      newDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      setTempSelectedDate(newDate);
+    } else {
+      // If no date is selected, use today with selected time
       const today = new Date();
-      datePickerRef.current.min = today.toISOString().slice(0, 16);
-
-      // Initialize with current value if it exists
-      if (tempSelectedDate) {
-        datePickerRef.current.value = tempSelectedDate
-          .toISOString()
-          .slice(0, 16);
-      } else if (value) {
-        const currentValue = new Date(value);
-        if (!isNaN(currentValue.getTime())) {
-          datePickerRef.current.value = currentValue.toISOString().slice(0, 16);
-        }
-      }
-
-      datePickerRef.current.showPicker();
+      today.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      onChange(today.toISOString());
     }
+    setShowTimePicker(false);
   };
 
   const handleConfirm = () => {
     if (tempSelectedDate) {
-      const isoString = tempSelectedDate.toISOString();
-      onChange(isoString);
+      onChange(tempSelectedDate.toISOString());
       setTempSelectedDate(null);
     }
     setIsOpen(false);
@@ -113,9 +115,48 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
     setIsOpen(false);
   };
 
+  const renderCalendar = () => {
+    const { daysInMonth, startingDay } = getDaysInMonth(currentMonth);
+    const today = new Date();
+    const days = [];
+
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDay; i++) {
+      days.push(
+        <div key={`empty-${i}`} className="calendar-day other-month"></div>
+      );
+    }
+
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(
+        currentMonth.getFullYear(),
+        currentMonth.getMonth(),
+        day
+      );
+      const isToday = date.toDateString() === today.toDateString();
+      const isSelected =
+        tempSelectedDate &&
+        date.toDateString() === tempSelectedDate.toDateString();
+      const isPast = date < today;
+
+      days.push(
+        <div
+          key={day}
+          className={`calendar-day ${isToday ? "today" : ""} ${
+            isSelected ? "selected" : ""
+          } ${isPast ? "disabled" : ""}`}
+          onClick={() => !isPast && handleDateSelect(day)}
+        >
+          {day}
+        </div>
+      );
+    }
+
+    return days;
+  };
+
   const dueText = value ? formatDueText(value) : null;
-  const tomorrow = getNextWeekday(1);
-  const nextWeek = getNextWeekday(7);
 
   return (
     <div className="due-date-dropdown">
@@ -141,59 +182,43 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
       </div>
       {isOpen && (
         <div className="due-date-options">
-          <div className="due-date-header">Due</div>
-          <div
-            className={`due-date-option ${
-              tempSelectedDate?.getTime() === getNextWeekday(0).getTime()
-                ? "selected"
-                : ""
-            }`}
-            onClick={() => handleOptionClick(getNextWeekday(0))}
-          >
-            <span className="calendar-icon">📅</span>
-            Today
-            <span className="day-label">
-              {formatDate(getNextWeekday(0))} {formatTime(getNextWeekday(0))}
-            </span>
+          <div className="due-date-header">Select date</div>
+          <div className="calendar-header">
+            <div className="month-year-selector">
+              {currentMonth.toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+              })}
+            </div>
+            <div className="calendar-nav">
+              <button className="nav-arrow" onClick={handlePrevMonth}>
+                ←
+              </button>
+              <button className="nav-arrow" onClick={handleNextMonth}>
+                →
+              </button>
+            </div>
           </div>
-          <div
-            className={`due-date-option ${
-              tempSelectedDate?.getTime() === tomorrow.getTime()
-                ? "selected"
-                : ""
-            }`}
-            onClick={() => handleOptionClick(tomorrow)}
-          >
-            <span className="calendar-icon">📅</span>
-            Tomorrow
-            <span className="day-label">
-              {formatDate(tomorrow)} {formatTime(tomorrow)}
-            </span>
+          <div className="calendar-grid">
+            {weekDays.map((day) => (
+              <div key={day} className="weekday-header">
+                {day}
+              </div>
+            ))}
+            {renderCalendar()}
           </div>
-          <div
-            className={`due-date-option ${
-              tempSelectedDate?.getTime() === nextWeek.getTime()
-                ? "selected"
-                : ""
-            }`}
-            onClick={() => handleOptionClick(nextWeek)}
-          >
-            <span className="calendar-icon">📅</span>
-            Next week
-            <span className="day-label">
-              {formatDate(nextWeek)} {formatTime(nextWeek)}
-            </span>
-          </div>
-          <div className="due-date-option custom-date">
-            <span className="calendar-icon">📅</span>
-            <span onClick={handleCustomDateClick}>Pick a date & time</span>
-            <input
-              ref={datePickerRef}
-              type="datetime-local"
-              className="hidden-datetime-input"
-              onChange={(e) => handleOptionClick(e.target.value, true)}
-              onClick={(e) => e.stopPropagation()}
-            />
+          <div className="custom-date">
+            <div
+              className="due-date-option"
+              onClick={() => setShowTimePicker(true)}
+            >
+              <span className="calendar-icon">⏰</span>
+              <span>
+                {tempSelectedDate
+                  ? formatTime(tempSelectedDate)
+                  : "Pick a time"}
+              </span>
+            </div>
           </div>
           <div className="due-date-actions">
             <button
@@ -209,6 +234,15 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
               OK
             </button>
           </div>
+        </div>
+      )}
+      {showTimePicker && (
+        <div className="time-picker-overlay">
+          <TimePickerModal
+            initialTime={tempSelectedDate || new Date()}
+            onConfirm={handleTimeSelect}
+            onCancel={() => setShowTimePicker(false)}
+          />
         </div>
       )}
     </div>
