@@ -198,6 +198,7 @@ function App() {
       // Validate date is not in the past
       const selectedDate = new Date(date);
       const now = new Date();
+      now.setSeconds(0, 0); // Reset seconds and milliseconds for fair comparison
       if (selectedDate < now) {
         showNotification("Due date cannot be in the past", "error");
         return;
@@ -213,7 +214,7 @@ function App() {
         ...selectedTask,
         temporal: {
           ...selectedTask.temporal,
-          due_date: selectedDate.toISOString(),
+          due_date: date, // Use the original ISO string to preserve exact time
         },
       };
       await updateTask(updatedTask);

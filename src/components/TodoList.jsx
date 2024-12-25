@@ -55,16 +55,48 @@ function TodoList({
     },
   };
 
+  const formatTime = (date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "pm" : "am";
+    const displayHours = hours % 12 || 12;
+
+    if (minutes === 0) {
+      return `@${displayHours}${ampm}`;
+    }
+    return `@${displayHours}:${minutes.toString().padStart(2, "0")}${ampm}`;
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return "";
 
-    return date.toLocaleDateString("en-US", {
-      month: "short",
+    const today = new Date();
+    const isToday =
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow =
+      date.getDate() === tomorrow.getDate() &&
+      date.getMonth() === tomorrow.getMonth() &&
+      date.getFullYear() === tomorrow.getFullYear();
+
+    if (isToday) {
+      return `Today ${formatTime(date)}`;
+    }
+    if (isTomorrow) {
+      return `Tomorrow ${formatTime(date)}`;
+    }
+
+    return `${date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "long",
       day: "numeric",
-      year: "numeric",
-    });
+    })} ${formatTime(date)}`;
   };
 
   const isOverdue = (date) => {
@@ -87,8 +119,7 @@ function TodoList({
     const nextWeek = new Date(today);
     nextWeek.setDate(nextWeek.getDate() + 7);
 
-    const nextMonth = new Date(today);
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    const thisMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     return tasks.reduce(
       (groups, task) => {
@@ -114,10 +145,10 @@ function TodoList({
           groups.dueTomorrow.push(task);
         } else if (dueDateObj <= nextWeek) {
           groups.dueThisWeek.push(task);
-        } else if (dueDateObj <= nextMonth) {
+        } else if (dueDateObj <= thisMonthEnd) {
           groups.dueThisMonth.push(task);
         } else {
-          groups.dueLater.push(task);
+          groups.future.push(task);
         }
 
         return groups;
@@ -128,7 +159,7 @@ function TodoList({
         dueTomorrow: [],
         dueThisWeek: [],
         dueThisMonth: [],
-        dueLater: [],
+        future: [],
         unscheduled: [],
       }
     );
@@ -252,7 +283,7 @@ function TodoList({
       {renderTaskGroup(groupedTasks.dueTomorrow, "Due Tomorrow")}
       {renderTaskGroup(groupedTasks.dueThisWeek, "Due This Week")}
       {renderTaskGroup(groupedTasks.dueThisMonth, "Due This Month")}
-      {renderTaskGroup(groupedTasks.dueLater, "Due Later")}
+      {renderTaskGroup(groupedTasks.future, "Future Tasks")}
       {renderTaskGroup(groupedTasks.unscheduled, "Unscheduled")}
     </motion.div>
   );

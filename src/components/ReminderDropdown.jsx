@@ -3,6 +3,7 @@ import "./ReminderDropdown.css";
 
 function ReminderDropdown({ value, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [tempSelectedDate, setTempSelectedDate] = useState(null);
   const datePickerRef = useRef(null);
 
   const formatDate = (date) => {
@@ -20,7 +21,7 @@ function ReminderDropdown({ value, onChange }) {
         minute: "2-digit",
         hour12: true,
       })
-      .toUpperCase();
+      .toLowerCase();
   };
 
   const getNextWeekday = (dayOffset) => {
@@ -34,7 +35,7 @@ function ReminderDropdown({ value, onChange }) {
     if (!dateStr) return null;
     const date = new Date(dateStr);
     return {
-      time: `Remind me at ${formatTime(date)}`,
+      time: "Remind me",
       day: formatDate(date),
     };
   };
@@ -50,8 +51,7 @@ function ReminderDropdown({ value, onChange }) {
       selectedDate.setHours(9, 0, 0, 0);
     }
 
-    onChange(selectedDate.toISOString());
-    setIsOpen(false);
+    setTempSelectedDate(selectedDate);
   };
 
   const handleCustomDateClick = (e) => {
@@ -61,6 +61,18 @@ function ReminderDropdown({ value, onChange }) {
       datePickerRef.current.min = now.toISOString().slice(0, 16);
       datePickerRef.current.showPicker();
     }
+  };
+
+  const handleConfirm = () => {
+    if (tempSelectedDate) {
+      onChange(tempSelectedDate.toISOString());
+    }
+    setIsOpen(false);
+  };
+
+  const handleCancel = () => {
+    setTempSelectedDate(null);
+    setIsOpen(false);
   };
 
   const reminderText = value ? formatReminderText(value) : null;
@@ -84,14 +96,22 @@ function ReminderDropdown({ value, onChange }) {
         <div className="reminder-options">
           <div className="reminder-header">Reminder</div>
           <div
-            className="reminder-option"
+            className={`reminder-option ${
+              tempSelectedDate?.getTime() === getNextWeekday(0).getTime()
+                ? "selected"
+                : ""
+            }`}
             onClick={() => handleOptionClick(getNextWeekday(0))}
           >
             <span className="time-icon">⏰</span>
             Later today
           </div>
           <div
-            className="reminder-option"
+            className={`reminder-option ${
+              tempSelectedDate?.getTime() === tomorrow.getTime()
+                ? "selected"
+                : ""
+            }`}
             onClick={() => handleOptionClick(tomorrow)}
           >
             <span className="time-icon">⏰</span>
@@ -99,7 +119,11 @@ function ReminderDropdown({ value, onChange }) {
             <span className="time-detail">{formatDate(tomorrow)}</span>
           </div>
           <div
-            className="reminder-option"
+            className={`reminder-option ${
+              tempSelectedDate?.getTime() === nextWeek.getTime()
+                ? "selected"
+                : ""
+            }`}
             onClick={() => handleOptionClick(nextWeek)}
           >
             <span className="time-icon">⏰</span>
@@ -116,6 +140,20 @@ function ReminderDropdown({ value, onChange }) {
               onChange={(e) => handleOptionClick(new Date(e.target.value))}
               onClick={(e) => e.stopPropagation()}
             />
+          </div>
+          <div className="reminder-actions">
+            <button
+              className="reminder-action-button cancel"
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              className="reminder-action-button confirm"
+              onClick={handleConfirm}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

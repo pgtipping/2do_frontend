@@ -20,13 +20,15 @@ function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
   };
 
   const formatTime = (date) => {
-    return date
-      .toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
-      .toLowerCase();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "pm" : "am";
+    const displayHours = hours % 12 || 12;
+
+    if (minutes === 0) {
+      return `@${displayHours}${ampm}`;
+    }
+    return `@${displayHours}:${minutes.toString().padStart(2, "0")}${ampm}`;
   };
 
   const formatDateTime = (dateTimeStr) => {
@@ -37,9 +39,20 @@ function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
       date.getMonth() === today.getMonth() &&
       date.getFullYear() === today.getFullYear();
 
-    return isToday
-      ? `Today @${formatTime(date)}`
-      : `${formatDate(date)} @${formatTime(date)}`;
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow =
+      date.getDate() === tomorrow.getDate() &&
+      date.getMonth() === tomorrow.getMonth() &&
+      date.getFullYear() === tomorrow.getFullYear();
+
+    if (isToday) {
+      return `Today ${formatTime(date)}`;
+    }
+    if (isTomorrow) {
+      return `Tomorrow ${formatTime(date)}`;
+    }
+    return `${formatDate(date)} ${formatTime(date)}`;
   };
 
   const getCustomCategories = () => {
