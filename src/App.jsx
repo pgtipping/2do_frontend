@@ -4,6 +4,7 @@ import TodoList from "./components/TodoList";
 import TaskInput from "./components/TaskInput";
 import DueDateDropdown from "./components/DueDateDropdown";
 import ReminderDropdown from "./components/ReminderDropdown";
+import RepeatDropdown from "./components/RepeatDropdown";
 import { fetchTodos, createTodo, updateTodo, deleteTodo } from "./utils/api";
 import { useNotifications } from "./contexts/NotificationContext";
 import { v4 as uuidv4 } from "uuid";
@@ -297,24 +298,29 @@ function App() {
     try {
       // Validate recurrence pattern
       const validPatterns = [
-        "DAILY",
-        "WEEKDAYS",
-        "WEEKLY",
-        "MONTHLY",
-        "MONDAY",
-        "TUESDAY",
-        "WEDNESDAY",
-        "THURSDAY",
-        "FRIDAY",
-        "SATURDAY",
-        "SUNDAY",
-        "BIWEEKLY",
-        "QUARTERLY",
-        "YEARLY",
+        "Daily",
+        "Weekdays",
+        "Weekly",
+        "Monthly",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+        "Bi-weekly",
+        "Quarterly",
+        "Yearly",
         "",
       ];
 
-      if (!validPatterns.includes(recurrence)) {
+      // Check if it's a comma-separated list of valid days
+      const isValidDaysList = recurrence
+        .split(", ")
+        .every((day) => validPatterns.includes(day));
+
+      if (!validPatterns.includes(recurrence) && !isValidDaysList) {
         showNotification("Invalid recurrence pattern", "error");
         return;
       }
@@ -506,42 +512,14 @@ function App() {
               />
             </div>
             <div className="task-details-section">
-              <div className="repeat-dropdown">
-                <div className="repeat-input">
-                  <span className="repeat-icon">🔄</span>
-                  <select
-                    className="repeat-select"
-                    value={
-                      selectedTask.temporal?.recurrence ||
-                      selectedTask.recurrence ||
-                      ""
-                    }
-                    onChange={(e) => handleRecurrenceChange(e.target.value)}
-                  >
-                    <option value="">No repeat</option>
-                    <optgroup label="Common">
-                      <option value="DAILY">Every day</option>
-                      <option value="WEEKDAYS">Every weekday</option>
-                      <option value="WEEKLY">Every week</option>
-                      <option value="MONTHLY">Every month</option>
-                    </optgroup>
-                    <optgroup label="Weekly">
-                      <option value="MONDAY">Every Monday</option>
-                      <option value="TUESDAY">Every Tuesday</option>
-                      <option value="WEDNESDAY">Every Wednesday</option>
-                      <option value="THURSDAY">Every Thursday</option>
-                      <option value="FRIDAY">Every Friday</option>
-                      <option value="SATURDAY">Every Saturday</option>
-                      <option value="SUNDAY">Every Sunday</option>
-                    </optgroup>
-                    <optgroup label="Other">
-                      <option value="BIWEEKLY">Every 2 weeks</option>
-                      <option value="QUARTERLY">Every 3 months</option>
-                      <option value="YEARLY">Every year</option>
-                    </optgroup>
-                  </select>
-                </div>
-              </div>
+              <RepeatDropdown
+                value={
+                  selectedTask.temporal?.recurrence ||
+                  selectedTask.recurrence ||
+                  ""
+                }
+                onChange={handleRecurrenceChange}
+              />
             </div>
             <div className="task-details-section">
               <div className="category-dropdown">
