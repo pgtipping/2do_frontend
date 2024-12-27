@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
 import "./DueDateDropdown.css";
 import TimePickerModal from "./TimePickerModal";
+import DateService from "../utils/dateUtils";
+import UserSettingsService from "../utils/userSettings";
 
 function DueDateDropdown({ value, onChange, isOverdue }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -8,14 +10,18 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
   const [tempSelectedDate, setTempSelectedDate] = useState(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
-  const weekDays = ["S", "M", "T", "W", "T", "F", "S"];
+  const weekDays = [
+    { key: "sun", label: "S" },
+    { key: "mon", label: "M" },
+    { key: "tue", label: "T" },
+    { key: "wed", label: "W" },
+    { key: "thu", label: "T" },
+    { key: "fri", label: "F" },
+    { key: "sat", label: "S" },
+  ];
 
   const formatDate = (date) => {
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "long",
-      day: "numeric",
-    });
+    return DateService.formatCurrentYear(date.toISOString());
   };
 
   const formatTime = (date) => {
@@ -32,18 +38,7 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
 
   const formatDueText = (dateStr) => {
     if (!dateStr) return null;
-    const date = new Date(dateStr);
-    const today = new Date();
-    const isToday =
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
-
-    if (isToday) {
-      return `Today ${formatTime(date)}`;
-    }
-
-    return `${formatDate(date)} ${formatTime(date)}`;
+    return DateService.formatTaskDate(dateStr);
   };
 
   const getDaysInMonth = (date) => {
@@ -79,24 +74,25 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
     // Preserve existing time or use current time
     const timeToUse = value ? new Date(value) : new Date();
     selected.setHours(timeToUse.getHours(), timeToUse.getMinutes(), 0, 0);
-    setTempSelectedDate(selected);
+
+    setTempSelectedDate(selected.toISOString());
   };
 
-  const handleTimeSelect = (time) => {
+  const handleTimeSelect = (selectedTime) => {
+    // If we have a value, update its time only
     if (value) {
-      // If we have an existing date, update its time
       const existingDate = new Date(value);
-      existingDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      existingDate.setHours(
+        selectedTime.getHours(),
+        selectedTime.getMinutes(),
+        0,
+        0
+      );
       onChange(existingDate.toISOString());
-    } else if (tempSelectedDate) {
-      // If we have a temp selected date but no saved date, update temp
-      const newDate = new Date(tempSelectedDate);
-      newDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
-      setTempSelectedDate(newDate);
     } else {
-      // If no date is selected, use today with selected time
+      // If no value, use today with selected time
       const today = new Date();
-      today.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      today.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
       onChange(today.toISOString());
     }
     setShowTimePicker(false);
@@ -104,10 +100,12 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
 
   const handleConfirm = () => {
     if (tempSelectedDate) {
-      onChange(tempSelectedDate.toISOString());
-      setTempSelectedDate(null);
+      // If we have a selected date, use it
+      onChange(tempSelectedDate);
     }
+    setTempSelectedDate(null);
     setIsOpen(false);
+    setShowTimePicker(false);
   };
 
   const handleCancel = () => {
@@ -119,11 +117,15 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
     const { daysInMonth, startingDay } = getDaysInMonth(currentMonth);
     const today = new Date();
     const days = [];
+    const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDay; i++) {
       days.push(
-        <div key={`empty-${i}`} className="calendar-day other-month"></div>
+        <div
+          key={`${monthKey}-empty-${i}`}
+          className="calendar-day other-month"
+        ></div>
       );
     }
 
@@ -134,15 +136,15 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
         currentMonth.getMonth(),
         day
       );
-      const isToday = date.toDateString() === today.toDateString();
+      const isToday = DateService.isSameDay(date, today);
       const isSelected =
         tempSelectedDate &&
-        date.toDateString() === tempSelectedDate.toDateString();
+        DateService.isSameDay(date, new Date(tempSelectedDate));
       const isPast = date < today;
 
       days.push(
         <div
-          key={day}
+          key={`${monthKey}-day-${day}`}
           className={`calendar-day ${isToday ? "today" : ""} ${
             isSelected ? "selected" : ""
           } ${isPast ? "disabled" : ""}`}
@@ -157,6 +159,12 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
   };
 
   const dueText = value ? formatDueText(value) : null;
+
+  // Format time for display
+  const formatTimeFromISOString = (isoString) => {
+    if (!isoString) return "Pick a time";
+    return DateService.formatTime(isoString);
+  };
 
   return (
     <div className="due-date-dropdown">
@@ -185,10 +193,7 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
           <div className="due-date-header">Select date</div>
           <div className="calendar-header">
             <div className="month-year-selector">
-              {currentMonth.toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })}
+              {DateService.formatCurrentYear(currentMonth.toISOString())}
             </div>
             <div className="calendar-nav">
               <button className="nav-arrow" onClick={handlePrevMonth}>
@@ -201,8 +206,8 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
           </div>
           <div className="calendar-grid">
             {weekDays.map((day) => (
-              <div key={day} className="weekday-header">
-                {day}
+              <div key={day.key} className="weekday-header">
+                {day.label}
               </div>
             ))}
             {renderCalendar()}
@@ -213,11 +218,7 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
               onClick={() => setShowTimePicker(true)}
             >
               <span className="calendar-icon">⏰</span>
-              <span>
-                {tempSelectedDate
-                  ? formatTime(tempSelectedDate)
-                  : "Pick a time"}
-              </span>
+              <span>{formatTimeFromISOString(tempSelectedDate)}</span>
             </div>
           </div>
           <div className="due-date-actions">
@@ -239,9 +240,13 @@ function DueDateDropdown({ value, onChange, isOverdue }) {
       {showTimePicker && (
         <div className="time-picker-overlay">
           <TimePickerModal
-            initialTime={tempSelectedDate || new Date()}
+            initialTime={
+              tempSelectedDate ? new Date(tempSelectedDate) : new Date()
+            }
             onConfirm={handleTimeSelect}
-            onCancel={() => setShowTimePicker(false)}
+            onCancel={() => {
+              setShowTimePicker(false);
+            }}
           />
         </div>
       )}

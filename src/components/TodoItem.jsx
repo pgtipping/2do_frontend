@@ -1,5 +1,7 @@
 import React from "react";
 import "./TodoItem.css";
+import DateService from "../utils/dateUtils";
+import UserSettingsService from "../utils/userSettings";
 
 const DEFAULT_CATEGORIES = {
   blue: { label: "Blue category", color: "#0078d4" },
@@ -11,50 +13,20 @@ const DEFAULT_CATEGORIES = {
 };
 
 function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
-  const formatDate = (date) => {
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "long",
-      day: "numeric",
+  // Get user's timezone preferences
+  const { showTimezoneIndicator } = UserSettingsService.getUserSettings();
+
+  // Format the task's date and time
+  const getFormattedDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return "";
+
+    return DateService.formatTaskDate(dateTimeStr, {
+      includeTime: true,
+      showTimezone: showTimezoneIndicator,
     });
   };
 
-  const formatTime = (date) => {
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? "pm" : "am";
-    const displayHours = hours % 12 || 12;
-
-    if (minutes === 0) {
-      return `@${displayHours}${ampm}`;
-    }
-    return `@${displayHours}:${minutes.toString().padStart(2, "0")}${ampm}`;
-  };
-
-  const formatDateTime = (dateTimeStr) => {
-    const date = new Date(dateTimeStr);
-    const today = new Date();
-    const isToday =
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const isTomorrow =
-      date.getDate() === tomorrow.getDate() &&
-      date.getMonth() === tomorrow.getMonth() &&
-      date.getFullYear() === tomorrow.getFullYear();
-
-    if (isToday) {
-      return `Today ${formatTime(date)}`;
-    }
-    if (isTomorrow) {
-      return `Tomorrow ${formatTime(date)}`;
-    }
-    return `${formatDate(date)} ${formatTime(date)}`;
-  };
-
+  // Get custom categories from storage
   const getCustomCategories = () => {
     try {
       const saved = localStorage.getItem("customCategories");
@@ -65,9 +37,11 @@ function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
     }
   };
 
+  // Render category tags
   const renderCategories = () => {
-    if (!todo.metadata?.categories || todo.metadata.categories.length === 0)
+    if (!todo.metadata?.categories || todo.metadata.categories.length === 0) {
       return null;
+    }
 
     const allCategories = { ...DEFAULT_CATEGORIES, ...getCustomCategories() };
 
@@ -91,46 +65,43 @@ function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
     );
   };
 
-  const isCompleted = todo.status === "COMPLETED";
-  const isImportant = todo.metadata?.isImportant;
-
-  const handleCheckboxClick = (e) => {
-    e.stopPropagation();
-    toggleTodo(todo.id);
-  };
-
-  const handleStarClick = (e) => {
-    e.stopPropagation();
-    toggleImportant(todo.id);
-  };
-
   return (
     <div
-      className={`todo-item ${isCompleted ? "completed" : ""} ${
-        isImportant ? "important" : ""
+      className={`todo-item ${todo.completed ? "completed" : ""} ${
+        todo.important ? "important" : ""
       }`}
       onClick={() => onSelectTask(todo)}
     >
-      <div className="todo-checkbox" onClick={handleCheckboxClick} />
-      <div className="todo-content">
-        <span className="todo-title">{todo.title}</span>
-        {renderCategories()}
+      <div className="todo-checkbox">
+        <input
+          type="checkbox"
+          checked={todo.completed}
+          onChange={() => toggleTodo(todo.id)}
+          onClick={(e) => e.stopPropagation()}
+        />
       </div>
-      <div className="todo-metadata">
+      <div className="todo-content">
+        <div className="todo-title">
+          <span>{todo.title}</span>
+          {todo.important && <span className="important-star">⭐</span>}
+        </div>
+        {renderCategories()}
+        {(todo.temporal?.due_date || todo.due_date) && (
+          <div className="todo-due-date">
+            {getFormattedDateTime(todo.temporal?.due_date || todo.due_date)}
+          </div>
+        )}
+      </div>
+      <div className="todo-actions">
         <button
-          className={`todo-star-button ${isImportant ? "active" : ""}`}
-          onClick={handleStarClick}
+          className={`important-toggle ${todo.important ? "active" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleImportant(todo.id);
+          }}
         >
           ⭐
         </button>
-        {todo.temporal?.due_date && (
-          <span className="todo-due-date">
-            {formatDateTime(todo.temporal.due_date)}
-          </span>
-        )}
-        {todo.metadata?.category === "Today" && !todo.temporal?.due_date && (
-          <span className="todo-today-tag">Today</span>
-        )}
       </div>
     </div>
   );

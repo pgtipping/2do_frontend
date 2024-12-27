@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./ReminderDropdown.css";
 import TimePickerModal from "./TimePickerModal";
+import DateService from "../utils/dateUtils";
+import UserSettingsService from "../utils/userSettings";
 
 function ReminderDropdown({ value, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,7 +12,15 @@ function ReminderDropdown({ value, onChange }) {
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
 
-  const weekDays = ["S", "M", "T", "W", "T", "F", "S"];
+  const weekDays = [
+    { key: "sun", label: "S" },
+    { key: "mon", label: "M" },
+    { key: "tue", label: "T" },
+    { key: "wed", label: "W" },
+    { key: "thu", label: "T" },
+    { key: "fri", label: "F" },
+    { key: "sat", label: "S" },
+  ];
 
   useEffect(() => {
     if (isOpen && dropdownRef.current && inputRef.current) {
@@ -69,18 +79,7 @@ function ReminderDropdown({ value, onChange }) {
 
   const formatReminderText = (dateStr) => {
     if (!dateStr) return null;
-    const date = new Date(dateStr);
-    const today = new Date();
-    const isToday =
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
-
-    if (isToday) {
-      return `Today ${formatTime(date)}`;
-    }
-
-    return `${formatDate(date)} ${formatTime(date)}`;
+    return DateService.formatTaskDate(dateStr);
   };
 
   const getDaysInMonth = (date) => {
@@ -116,35 +115,56 @@ function ReminderDropdown({ value, onChange }) {
     // Preserve existing time or use current time
     const timeToUse = value ? new Date(value) : new Date();
     selected.setHours(timeToUse.getHours(), timeToUse.getMinutes(), 0, 0);
-    setTempSelectedDate(selected);
+
+    setTempSelectedDate(selected.toISOString());
   };
 
-  const handleTimeSelect = (time) => {
-    if (value) {
-      // If we have an existing date, update its time
-      const existingDate = new Date(value);
-      existingDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
-      onChange(existingDate.toISOString());
-    } else if (tempSelectedDate) {
-      // If we have a temp selected date but no saved date, update temp
-      const newDate = new Date(tempSelectedDate);
-      newDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
-      setTempSelectedDate(newDate);
+  const handleTimeSelect = (selectedTime) => {
+    let baseDate;
+
+    if (tempSelectedDate) {
+      // If we have a temp selected date, update its time
+      baseDate = new Date(tempSelectedDate);
+      baseDate.setHours(
+        selectedTime.getHours(),
+        selectedTime.getMinutes(),
+        0,
+        0
+      );
+      setTempSelectedDate(baseDate.toISOString());
+      onChange(baseDate.toISOString());
+    } else if (value) {
+      // If we have a value but no temp date, update value's time
+      baseDate = new Date(value);
+      baseDate.setHours(
+        selectedTime.getHours(),
+        selectedTime.getMinutes(),
+        0,
+        0
+      );
+      onChange(baseDate.toISOString());
     } else {
       // If no date is selected, use today with selected time
-      const today = new Date();
-      today.setHours(time.getHours(), time.getMinutes(), 0, 0);
-      onChange(today.toISOString());
+      baseDate = new Date();
+      baseDate.setHours(
+        selectedTime.getHours(),
+        selectedTime.getMinutes(),
+        0,
+        0
+      );
+      onChange(baseDate.toISOString());
     }
     setShowTimePicker(false);
   };
 
   const handleConfirm = () => {
     if (tempSelectedDate) {
-      onChange(tempSelectedDate.toISOString());
-      setTempSelectedDate(null);
+      // If we have a selected date, use it
+      onChange(tempSelectedDate);
     }
+    setTempSelectedDate(null);
     setIsOpen(false);
+    setShowTimePicker(false);
   };
 
   const handleCancel = () => {
@@ -156,11 +176,15 @@ function ReminderDropdown({ value, onChange }) {
     const { daysInMonth, startingDay } = getDaysInMonth(currentMonth);
     const today = new Date();
     const days = [];
+    const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDay; i++) {
       days.push(
-        <div key={`empty-${i}`} className="calendar-day other-month"></div>
+        <div
+          key={`${monthKey}-empty-${i}`}
+          className="calendar-day other-month"
+        ></div>
       );
     }
 
@@ -171,15 +195,15 @@ function ReminderDropdown({ value, onChange }) {
         currentMonth.getMonth(),
         day
       );
-      const isToday = date.toDateString() === today.toDateString();
+      const isToday = DateService.isSameDay(date, today);
       const isSelected =
         tempSelectedDate &&
-        date.toDateString() === tempSelectedDate.toDateString();
+        DateService.isSameDay(date, new Date(tempSelectedDate));
       const isPast = date < today;
 
       days.push(
         <div
-          key={day}
+          key={`${monthKey}-day-${day}`}
           className={`calendar-day ${isToday ? "today" : ""} ${
             isSelected ? "selected" : ""
           } ${isPast ? "disabled" : ""}`}
@@ -191,6 +215,12 @@ function ReminderDropdown({ value, onChange }) {
     }
 
     return days;
+  };
+
+  // Format time for display
+  const formatTimeFromISOString = (isoString) => {
+    if (!isoString) return "Pick a time";
+    return DateService.formatTime(isoString);
   };
 
   const reminderText = value ? formatReminderText(value) : null;
@@ -217,10 +247,7 @@ function ReminderDropdown({ value, onChange }) {
           <div className="reminder-header">Set reminder</div>
           <div className="calendar-header">
             <div className="month-year-selector">
-              {currentMonth.toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })}
+              {DateService.formatCurrentYear(currentMonth.toISOString())}
             </div>
             <div className="calendar-nav">
               <button className="nav-arrow" onClick={handlePrevMonth}>
@@ -233,8 +260,8 @@ function ReminderDropdown({ value, onChange }) {
           </div>
           <div className="calendar-grid">
             {weekDays.map((day) => (
-              <div key={day} className="weekday-header">
-                {day}
+              <div key={day.key} className="weekday-header">
+                {day.label}
               </div>
             ))}
             {renderCalendar()}
@@ -245,11 +272,7 @@ function ReminderDropdown({ value, onChange }) {
               onClick={() => setShowTimePicker(true)}
             >
               <span className="reminder-icon">⏰</span>
-              <span>
-                {tempSelectedDate
-                  ? formatTime(tempSelectedDate)
-                  : "Pick a time"}
-              </span>
+              <span>{formatTimeFromISOString(value || tempSelectedDate)}</span>
             </div>
           </div>
           <div className="reminder-actions">
@@ -271,9 +294,17 @@ function ReminderDropdown({ value, onChange }) {
       {showTimePicker && (
         <div className="time-picker-overlay">
           <TimePickerModal
-            initialTime={tempSelectedDate || new Date()}
+            initialTime={
+              tempSelectedDate
+                ? new Date(tempSelectedDate)
+                : value
+                ? new Date(value)
+                : new Date()
+            }
             onConfirm={handleTimeSelect}
-            onCancel={() => setShowTimePicker(false)}
+            onCancel={() => {
+              setShowTimePicker(false);
+            }}
           />
         </div>
       )}

@@ -8,6 +8,7 @@ import RepeatDropdown from "./components/RepeatDropdown";
 import { fetchTodos, createTodo, updateTodo, deleteTodo } from "./utils/api";
 import { useNotifications } from "./contexts/NotificationContext";
 import { v4 as uuidv4 } from "uuid";
+import DateService from "./utils/dateUtils";
 
 function App() {
   const [todos, setTodos] = useState([]);
@@ -177,35 +178,8 @@ function App() {
     }
   });
 
-  const formatDate = (date) => {
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const formatTime = (date) => {
-    return date
-      .toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
-      .toLowerCase();
-  };
-
   const formatDateTime = (dateTimeStr) => {
-    const date = new Date(dateTimeStr);
-    const today = new Date();
-    const isToday =
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
-
-    return isToday
-      ? `Today @${formatTime(date)}`
-      : `${formatDate(date)} @${formatTime(date)}`;
+    return DateService.formatTaskDate(dateTimeStr);
   };
 
   const handleDueDateChange = async (date) => {

@@ -29,7 +29,7 @@ function TimePickerModal({ initialTime, onConfirm, onCancel }) {
   };
 
   const handleConfirm = () => {
-    const date = new Date();
+    const date = initialTime ? new Date(initialTime) : new Date();
     let hours = hour;
     if (isPM && hours !== 12) hours += 12;
     if (!isPM && hours === 12) hours = 0;
