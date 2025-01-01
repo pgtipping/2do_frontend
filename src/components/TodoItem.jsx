@@ -1,110 +1,154 @@
-import React from "react";
+import React, { useState } from "react";
+import TaskNoteEditor from "./TaskNoteEditor";
 import "./TodoItem.css";
-import DateService from "../utils/dateUtils";
-import UserSettingsService from "../utils/userSettings";
 
-const DEFAULT_CATEGORIES = {
-  blue: { label: "Blue category", color: "#0078d4" },
-  green: { label: "Green category", color: "#107c10" },
-  orange: { label: "Orange category", color: "#ff8c00" },
-  purple: { label: "Purple category", color: "#5c2d91" },
-  red: { label: "Red category", color: "#d83b01" },
-  yellow: { label: "Yellow category", color: "#ffd700" },
-};
+function TodoItem({
+  todo,
+  toggleTodo,
+  toggleImportant,
+  onSelectTask,
+  onUpdateTask,
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
 
-function TodoItem({ todo, toggleTodo, toggleImportant, onSelectTask }) {
-  // Get user's timezone preferences
-  const { showTimezoneIndicator } = UserSettingsService.getUserSettings();
-
-  // Format the task's date and time
-  const getFormattedDateTime = (dateTimeStr) => {
-    if (!dateTimeStr) return "";
-
-    return DateService.formatTaskDate(dateTimeStr, {
-      includeTime: true,
-      showTimezone: showTimezoneIndicator,
+  const handleNoteChange = (newContent) => {
+    onUpdateTask(todo.id, {
+      ...todo,
+      description: newContent,
     });
   };
 
-  // Get custom categories from storage
-  const getCustomCategories = () => {
-    try {
-      const saved = localStorage.getItem("customCategories");
-      return saved ? JSON.parse(saved) : {};
-    } catch (error) {
-      console.error("Error loading custom categories:", error);
-      return {};
-    }
+  const handleAttachmentAdd = (attachment) => {
+    onUpdateTask(todo.id, {
+      ...todo,
+      attachments: [...(todo.attachments || []), attachment],
+    });
   };
 
-  // Render category tags
+  const handleAttachmentRemove = (attachmentId) => {
+    onUpdateTask(todo.id, {
+      ...todo,
+      attachments: (todo.attachments || []).filter(
+        (a) => a.id !== attachmentId
+      ),
+    });
+  };
+
   const renderCategories = () => {
-    if (!todo.metadata?.categories || todo.metadata.categories.length === 0) {
-      return null;
-    }
-
-    const allCategories = { ...DEFAULT_CATEGORIES, ...getCustomCategories() };
-
+    if (!todo.metadata?.category) return null;
     return (
       <div className="todo-categories">
-        {todo.metadata.categories.map((categoryKey) => {
-          const category = allCategories[categoryKey];
-          if (!category) return null;
-
-          return (
-            <span
-              key={categoryKey}
-              className="todo-category-tag"
-              style={{ backgroundColor: category.color }}
-            >
-              {category.label}
-            </span>
-          );
-        })}
+        <span
+          className="todo-category-tag"
+          style={{ backgroundColor: getCategoryColor(todo.metadata.category) }}
+        >
+          {todo.metadata.category}
+        </span>
       </div>
     );
   };
 
+  const getFormattedDateTime = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const isToday = date.toDateString() === today.toDateString();
+    const isTomorrow = date.toDateString() === tomorrow.toDateString();
+
+    let dateText = "";
+    if (isToday) {
+      dateText = "Today";
+    } else if (isTomorrow) {
+      dateText = "Tomorrow";
+    } else {
+      dateText = date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+    }
+
+    const timeText = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    return `${dateText} ${timeText}`;
+  };
+
   return (
     <div
-      className={`todo-item ${todo.completed ? "completed" : ""} ${
-        todo.important ? "important" : ""
+      className={`todo-item ${todo.status === "COMPLETED" ? "completed" : ""} ${
+        todo.metadata?.isImportant ? "important" : ""
       }`}
-      onClick={() => onSelectTask(todo)}
     >
-      <div className="todo-checkbox">
-        <input
-          type="checkbox"
-          checked={todo.completed}
-          onChange={() => toggleTodo(todo.id)}
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
-      <div className="todo-content">
-        <div className="todo-title">
-          <span>{todo.title}</span>
-          {todo.important && <span className="important-star">⭐</span>}
+      <div className="todo-header" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="todo-checkbox">
+          <input
+            type="checkbox"
+            checked={todo.status === "COMPLETED"}
+            onChange={() => toggleTodo(todo.id)}
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
-        {renderCategories()}
-        {(todo.temporal?.due_date || todo.due_date) && (
-          <div className="todo-due-date">
-            {getFormattedDateTime(todo.temporal?.due_date || todo.due_date)}
+        <div className="todo-content">
+          <div className="todo-title">
+            <span>{todo.title}</span>
+            {todo.metadata?.isImportant && (
+              <span className="important-star">⭐</span>
+            )}
           </div>
-        )}
+          {renderCategories()}
+          {(todo.temporal?.due_date || todo.due_date) && (
+            <div className="todo-due-date">
+              {getFormattedDateTime(todo.temporal?.due_date || todo.due_date)}
+            </div>
+          )}
+        </div>
+        <div className="todo-actions">
+          <button
+            className={`important-toggle ${
+              todo.metadata?.isImportant ? "active" : ""
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleImportant(todo.id);
+            }}
+          >
+            ⭐
+          </button>
+        </div>
       </div>
-      <div className="todo-actions">
-        <button
-          className={`important-toggle ${todo.important ? "active" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleImportant(todo.id);
-          }}
-        >
-          ⭐
-        </button>
-      </div>
+
+      {isExpanded && (
+        <div className="todo-details">
+          <TaskNoteEditor
+            initialContent={todo.description || ""}
+            onChange={handleNoteChange}
+            onAttachmentAdd={handleAttachmentAdd}
+            onAttachmentRemove={handleAttachmentRemove}
+            readOnly={todo.status === "COMPLETED"}
+          />
+        </div>
+      )}
     </div>
   );
+}
+
+function getCategoryColor(category) {
+  const colors = {
+    Work: "#4CAF50",
+    Personal: "#2196F3",
+    Shopping: "#FF9800",
+    Health: "#E91E63",
+    Other: "#9C27B0",
+  };
+  return colors[category] || colors.Other;
 }
 
 export default TodoItem;

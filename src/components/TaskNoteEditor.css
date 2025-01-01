@@ -1,0 +1,299 @@
+.task-note-editor {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--background-light);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 4px;
+  padding: 0 4px;
+  border-right: 1px solid var(--border-color);
+}
+
+.toolbar-group:last-child {
+  border-right: none;
+}
+
+.template-selector {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.editor-toolbar button {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+
+.editor-toolbar button:hover {
+  background: var(--hover-color);
+}
+
+.editor-toolbar button.is-active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.file-upload-button {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+
+.file-upload-button:hover {
+  background: var(--hover-color);
+}
+
+.editor-content {
+  padding: 16px;
+  min-height: 200px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.editor-content.preview-mode {
+  background: var(--background-light);
+}
+
+/* Enhanced Markdown Styling */
+.ProseMirror {
+  outline: none;
+  line-height: 1.6;
+}
+
+.ProseMirror p {
+  margin: 0 0 1em 0;
+}
+
+.ProseMirror h1 {
+  font-size: 1.8em;
+  font-weight: 600;
+  margin: 1.2em 0 0.6em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.ProseMirror li {
+  margin: 0.3em 0;
+}
+
+.ProseMirror code {
+  background: var(--code-background);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.ProseMirror pre {
+  background: var(--code-background);
+  padding: 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.9em;
+  color: var(--code-text);
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 1em 0;
+}
+
+.ProseMirror blockquote {
+  border-left: 4px solid var(--border-color);
+  margin: 1em 0;
+  padding-left: 1em;
+  color: var(--text-secondary);
+}
+
+/* Task List Styling */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  margin: 0.5em 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  margin-right: 0.5em;
+}
+
+/* Collapsible Section Styling */
+.ProseMirror details.collapsible-section {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin: 1em 0;
+  background: white;
+}
+
+.ProseMirror details.collapsible-section summary {
+  padding: 0.5em 1em;
+  background: var(--background-light);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.ProseMirror details.collapsible-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.ProseMirror details.collapsible-section summary::before {
+  content: "▶";
+  margin-right: 0.5em;
+  font-size: 0.8em;
+  transition: transform 0.2s;
+}
+
+.ProseMirror details.collapsible-section[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.ProseMirror details.collapsible-section .collapsible-content {
+  padding: 1em;
+  border-top: 1px solid var(--border-color);
+}
+
+.attachments-list {
+  padding: 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--background-light);
+}
+
+.attachments-list h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+.attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.attachment-item {
+  position: relative;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  background: white;
+}
+
+.attachment-item img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+}
+
+.file-icon {
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  background: var(--background-light);
+}
+
+.attachment-name {
+  display: block;
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: white;
+}
+
+.remove-attachment {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.remove-attachment:hover {
+  background: rgba(0, 0, 0, 0.7);
+}

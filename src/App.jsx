@@ -19,6 +19,27 @@ function App() {
 
   useEffect(() => {
     loadTodos();
+
+    // Add click handler to clear selected task when clicking outside
+    const handleClickOutside = (event) => {
+      const taskElements = document.querySelectorAll(".task-item, .task-input");
+      let clickedInside = false;
+
+      taskElements.forEach((element) => {
+        if (element.contains(event.target)) {
+          clickedInside = true;
+        }
+      });
+
+      if (!clickedInside) {
+        setSelectedTask(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   const loadTodos = async () => {
@@ -40,7 +61,9 @@ function App() {
       };
       const createdTask = await createTodo(newTask);
       setTodos([...todos, createdTask]);
+      setSelectedTask(null);
       showNotification("Task created successfully", "success");
+      return createdTask;
     } catch (error) {
       console.error("Error creating todo:", error);
       showNotification("Error creating task", "error");

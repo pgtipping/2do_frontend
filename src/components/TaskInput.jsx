@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./TaskInput.css";
-import TaskFeedback from "./TaskFeedback";
+import TaskConversation from "./TaskConversation";
 import { initializePusher } from "../utils/pusher";
 import {
   getCommonTaskTimes,
@@ -12,7 +12,8 @@ import {
 function TaskInput({ onAddTodo, selectedTask, onUpdateTask, todos }) {
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
+  const [llmResponse, setLlmResponse] = useState(null);
+  const [conversationContext, setConversationContext] = useState({});
   const inputRef = useRef(null);
   const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -215,42 +216,16 @@ function TaskInput({ onAddTodo, selectedTask, onUpdateTask, todos }) {
       setFeedback({
         type: "pending",
         display: "Processing...",
-        requiresAttention: false,
       });
 
-      const resolvedInput = resolveRelativeDate(inputText);
       const response = await fetch("http://localhost:5000/api/parse-task", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userInput: resolvedInput,
-          requestSource: isListening ? "voice" : "text",
-          sessionContext: {
-            timezone: {
-              name: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              current_time: new Date().toLocaleString(),
-            },
-            tasks: todos
-              ? {
-                  recent: todos.slice(-5),
-                  similar: findRelatedTasks(todos, inputText),
-                  today: todos.filter((t) => t.metadata?.isToday),
-                  patterns: {
-                    common_times: getCommonTaskTimes(todos),
-                    preferred_days: getPreferredDays(todos),
-                    categories: getCategoryDistribution(todos),
-                  },
-                }
-              : {},
-            userPreferences: {
-              defaultPriority: "medium",
-              defaultReminder: 15,
-              preferredTime: "morning",
-            },
-          },
-          recentActions,
+          userInput: inputText,
+          sessionContext: conversationContext,
         }),
       });
 
@@ -259,32 +234,32 @@ function TaskInput({ onAddTodo, selectedTask, onUpdateTask, todos }) {
         setFeedback({
           type: "error",
           display: errorData.feedback?.display || "Failed to create task",
-          requiresAttention: true,
         });
         return;
       }
 
       const data = await response.json();
-      setAnalysis(data.analysis);
+
+      // Update conversation context
+      if (data.task) {
+        setConversationContext((prev) => ({
+          ...prev,
+          lastTaskId: data.task.id,
+          lastAction: isUpdateMode ? "update" : "create",
+        }));
+      }
+
+      // Set LLM response for conversation
+      setLlmResponse(data.llm_response);
 
       if (isUpdateMode && selectedTask) {
-        onUpdateTask(selectedTask.id, {
-          title: data.task.title,
-          description: data.task.description,
-          priority: data.task.priority,
-          temporal: data.task.temporal,
-          tags: data.task.tags,
-          dependencies: data.task.dependencies,
-        });
-
+        onUpdateTask(selectedTask.id, data.task);
         if (isListening) {
           speakToUser(`Updated task: ${data.task.title}`);
         }
-
         setFeedback({
           type: "success",
           display: data.feedback?.display || "Task updated successfully",
-          requiresAttention: false,
         });
       } else {
         const newTodo = await onAddTodo(data.task);
@@ -292,38 +267,27 @@ function TaskInput({ onAddTodo, selectedTask, onUpdateTask, todos }) {
           if (isListening) {
             speakToUser(`Created task: ${data.task.title}`);
           }
-
           setFeedback({
             type: "success",
             display: data.feedback?.display || "Task created successfully",
-            requiresAttention: false,
           });
-
-          setRecentActions((prev) => [
-            ...prev,
-            {
-              type: "create",
-              taskId: newTodo.id,
-              timestamp: new Date().toISOString(),
-              task: data.task,
-              requires_completion: data.analysis?.completeness < 1,
-            },
-          ]);
         } else {
           setFeedback({
             type: "error",
             display: "Failed to create task",
-            requiresAttention: true,
           });
         }
       }
-      setText("");
+
+      // Only clear text if no follow-up needed
+      if (!data.llm_response?.message) {
+        setText("");
+      }
     } catch (error) {
       console.error("Error creating task:", error);
       setFeedback({
         type: "error",
         display: "Failed to create task",
-        requiresAttention: true,
       });
     } finally {
       setIsProcessing(false);
@@ -376,23 +340,26 @@ function TaskInput({ onAddTodo, selectedTask, onUpdateTask, todos }) {
     }
   };
 
-  const handleAnswerQuestion = async (question, answer) => {
-    if (!text.trim()) return;
-
+  const handleAnswerQuestion = async (type, answer) => {
     try {
+      setIsProcessing(true);
       setFeedback({
         type: "pending",
         display: "Processing...",
-        requiresAttention: false,
       });
-      const response = await fetch("http://localhost:5000/api/parse-task", {
+
+      const response = await fetch("http://localhost:5000/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userInput: text,
-          answer: { question, answer },
+          userInput: answer,
+          sessionContext: {
+            ...conversationContext,
+            responseType: type,
+            previousMessage: llmResponse?.message,
+          },
         }),
       });
 
@@ -400,55 +367,42 @@ function TaskInput({ onAddTodo, selectedTask, onUpdateTask, todos }) {
         const errorData = await response.json();
         setFeedback({
           type: "error",
-          display: errorData.feedback?.display || "Failed to create task",
-          requiresAttention: true,
+          display: errorData.feedback?.display || "Failed to process response",
         });
         return;
       }
 
       const data = await response.json();
-      setAnalysis(data.analysis);
 
-      if (isUpdateMode && selectedTask) {
-        // Update existing task
-        onUpdateTask(selectedTask.id, {
-          title: data.task.title,
-          description: data.task.description,
-          priority: data.task.priority,
-          temporal: data.task.temporal,
-          tags: data.task.tags,
-          dependencies: data.task.dependencies,
-        });
-        setFeedback({
-          type: "success",
-          display: data.feedback?.display || "Task updated successfully",
-          requiresAttention: false,
-        });
-      } else {
-        // Create new task
-        const newTodo = onAddTodo(data.task);
-        if (newTodo) {
-          setFeedback({
-            type: "success",
-            display: data.feedback?.display || "Task created successfully",
-            requiresAttention: false,
-          });
-        } else {
-          setFeedback({
-            type: "error",
-            display: "Failed to create task",
-            requiresAttention: true,
-          });
-        }
+      // Update conversation context
+      setConversationContext((prev) => ({
+        ...prev,
+        lastResponse: answer,
+        lastResponseType: type,
+      }));
+
+      // Update LLM response for continued conversation
+      setLlmResponse(data.llm_response);
+
+      setFeedback({
+        type: "success",
+        display: data.feedback?.display || "Response processed successfully",
+      });
+
+      // Only clear text if conversation is complete
+      if (!data.llm_response?.message) {
+        setText("");
+        setLlmResponse(null);
+        setConversationContext({});
       }
-      setText("");
     } catch (error) {
-      console.error("Error creating task:", error);
+      console.error("Error processing response:", error);
       setFeedback({
         type: "error",
-        display: "Failed to create task",
-        requiresAttention: true,
+        display: "Failed to process response",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -516,9 +470,9 @@ function TaskInput({ onAddTodo, selectedTask, onUpdateTask, todos }) {
           {isProcessing ? "Processing..." : isUpdateMode ? "Update" : "Add"}
         </button>
       </div>
-      <TaskFeedback
+      <TaskConversation
         feedback={feedback}
-        analysis={analysis}
+        llm_response={llmResponse}
         onAnswerQuestion={handleAnswerQuestion}
       />
     </div>
