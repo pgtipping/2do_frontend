@@ -1,31 +1,31 @@
 .task-input-container {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  background-color: #f0f0f0;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.task-input {
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border-radius: 0;
+  border-bottom: 1px solid #ddd;
   width: 100%;
-  margin-bottom: 20px;
+  position: relative;
+  z-index: 10;
 }
 
 .task-input-field {
   flex: 1;
-  padding: 12px;
+  width: 100%;
+  padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
-  font-size: 16px;
-  transition: border-color 0.3s ease;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background-color: #ffffff;
 }
 
 .task-input-field:focus {
   outline: none;
   border-color: #4caf50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
 }
 
 .task-input-field:disabled {
@@ -33,46 +33,17 @@
   cursor: not-allowed;
 }
 
-.voice-input-button {
-  padding: 10px;
-  border: none;
-  border-radius: 50%;
-  background-color: #f0f0f0;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-}
-
-.voice-input-button:hover {
-  background-color: #e0e0e0;
-}
-
-.voice-input-button.listening {
-  background-color: #ff4444;
-  color: white;
-  animation: pulse 1.5s infinite;
-}
-
-.voice-input-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .add-task-button {
-  padding: 10px 20px;
+  padding: 8px 16px;
   background-color: #4caf50;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   transition: background-color 0.3s ease;
-  min-width: 100px;
+  min-width: 80px;
+  white-space: nowrap;
 }
 
 .add-task-button:hover {
@@ -84,14 +55,27 @@
   cursor: not-allowed;
 }
 
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
+/* Toggle button styles */
+.task-input-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 12px;
+  transition: all 0.2s ease;
+}
+
+.task-input-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.task-input-toggle.open {
+  transform: rotate(45deg);
 }

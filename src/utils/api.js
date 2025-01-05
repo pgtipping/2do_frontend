@@ -13,26 +13,36 @@ export async function fetchTodos() {
   }
 }
 
-export async function createTodo(task) {
+export async function createTodo(task, useLLM = false) {
   try {
-    const response = await fetch(`${API_BASE_URL}/tasks`, {
+    // Ensure task data is properly formatted
+    const taskData = useLLM ? { input: task.input } : { title: task };
+
+    const response = await fetch(`${API_BASE_URL}/tasks?useLLM=${useLLM}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(task),
+      body: JSON.stringify(taskData),
+    }).catch((error) => {
+      // Handle network errors
+      throw new Error("Unable to reach server");
     });
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Unable to save task");
     }
-    return await response.json();
+
+    const data = await response.json();
+    return data.task;
   } catch (error) {
     console.error("Failed to create todo:", error);
-    throw error;
+    throw error; // Propagate specific error message to component
   }
 }
 
-export async function updateTodo(task) {
+export async function updateTodo(task, useLLM = false) {
   try {
     // Handle both nested and unnested temporal data
     const temporalData = task.temporal || {
@@ -42,27 +52,39 @@ export async function updateTodo(task) {
       reminder: task.reminder,
     };
 
-    const response = await fetch(`${API_BASE_URL}/tasks/${task.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: task.id,
-        ...task,
-        // Always send temporal data at root level for backend
-        due_date: temporalData.due_date,
-        start_date: temporalData.start_date,
-        recurrence: temporalData.recurrence,
-        reminder: temporalData.reminder,
-        // Remove nested temporal to avoid duplication
-        temporal: undefined,
-      }),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/tasks/${task.id}?useLLM=${useLLM}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          useLLM
+            ? {
+                input: task.title,
+                taskId: task.id,
+              }
+            : {
+                ...task,
+                // Always send temporal data at root level for backend
+                due_date: temporalData.due_date,
+                start_date: temporalData.start_date,
+                recurrence: temporalData.recurrence,
+                reminder: temporalData.reminder,
+                // Remove nested temporal to avoid duplication
+                temporal: undefined,
+              }
+        ),
+      }
+    );
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const updatedTask = await response.json();
+
+    const data = await response.json();
+    const updatedTask = data.task;
 
     // Reconstruct temporal object for frontend compatibility
     return {

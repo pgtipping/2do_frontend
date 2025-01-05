@@ -2,9 +2,11 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 import TodoList from "./components/TodoList";
 import TaskInput from "./components/TaskInput";
+import TaskHeader from "./components/TaskHeader";
 import DueDateDropdown from "./components/DueDateDropdown";
 import ReminderDropdown from "./components/ReminderDropdown";
 import RepeatDropdown from "./components/RepeatDropdown";
+import NotificationBell from "./components/NotificationBell";
 import { fetchTodos, createTodo, updateTodo, deleteTodo } from "./utils/api";
 import { useNotifications } from "./contexts/NotificationContext";
 import { v4 as uuidv4 } from "uuid";
@@ -15,6 +17,7 @@ function App() {
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
+  const [isTaskInputVisible, setIsTaskInputVisible] = useState(false);
   const { showNotification } = useNotifications();
 
   useEffect(() => {
@@ -51,19 +54,13 @@ function App() {
     }
   };
 
-  const addTodo = async (title) => {
+  const addTodo = async (task) => {
     try {
-      const newTask = {
-        id: uuidv4(),
-        title,
-        status: "PENDING",
-        metadata: { isImportant: false },
-      };
-      const createdTask = await createTodo(newTask);
-      setTodos([...todos, createdTask]);
-      setSelectedTask(null);
+      // Add task to UI immediately
+      setTodos((prevTodos) => [...prevTodos, task]);
       showNotification("Task created successfully", "success");
-      return createdTask;
+      setSelectedTask(null);
+      return task;
     } catch (error) {
       console.error("Error creating todo:", error);
       showNotification("Error creating task", "error");
@@ -402,6 +399,10 @@ function App() {
     }
   };
 
+  const toggleTaskInput = () => {
+    setIsTaskInputVisible(!isTaskInputVisible);
+  };
+
   return (
     <div className="app">
       <nav className="sidebar">
@@ -445,38 +446,44 @@ function App() {
         </div>
       </nav>
 
-      <main className="main-content">
+      <div className="main-content">
         <header className="header">
-          <h1>Tasks</h1>
-          <input
-            type="text"
-            className="search-bar"
-            placeholder="Search tasks"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+          <TaskHeader
+            isInputOpen={isTaskInputVisible}
+            onToggleInput={toggleTaskInput}
           />
+          <div className="header-controls">
+            <input
+              type="text"
+              className="search-bar"
+              placeholder="Search tasks"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <NotificationBell />
+          </div>
         </header>
 
-        <div className="todo-list">
-          <TodoList
-            todos={filteredTodos}
-            toggleTodo={toggleTodo}
-            toggleImportant={toggleImportant}
-            onSelectTask={handleSelectTask}
-            onUpdateTask={updateTask}
-            onDeleteTask={handleTaskModification}
-            selectedTask={selectedTask}
-          />
-          <div className="task-input-container">
-            <TaskInput
-              onAddTodo={addTodo}
-              selectedTask={selectedTask}
-              onUpdateTask={updateTask}
-              todos={todos}
-            />
-          </div>
-        </div>
-      </main>
+        <TaskInput
+          onAddTodo={addTodo}
+          selectedTask={selectedTask}
+          onUpdateTask={updateTask}
+          isVisible={isTaskInputVisible}
+          onClose={() => setIsTaskInputVisible(false)}
+        />
+
+        <TodoList
+          todos={filteredTodos}
+          onToggle={toggleTodo}
+          onDelete={deleteTask}
+          onSelectTask={handleSelectTask}
+          filter={filter}
+          searchQuery={searchQuery}
+          selectedTask={selectedTask}
+          onFilterChange={handleFilterChange}
+          onSearchChange={setSearchQuery}
+        />
+      </div>
 
       {selectedTask && (
         <aside className="right-panel">

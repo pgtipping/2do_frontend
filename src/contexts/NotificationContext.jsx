@@ -15,8 +15,9 @@ export function NotificationProvider({ children }) {
 
         const notification = {
           id: Date.now(),
+          type: data.type,
           message: data.data.message,
-          timestamp: new Date().toISOString(),
+          timestamp: data.timestamp,
           isRead: false,
           data: data.data,
         };
