@@ -5,7 +5,7 @@ import "./NotificationBell.css";
 
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
-  const { notifications, unreadCount, markAsRead, clearNotifications } =
+  const { notifications, unreadCount, markAllAsRead, clearNotifications } =
     useNotifications();
   const notificationRef = useRef(null);
 
@@ -26,11 +26,10 @@ export default function NotificationBell() {
   }, []);
 
   const toggleNotifications = () => {
+    if (!isOpen) {
+      markAllAsRead();
+    }
     setIsOpen(!isOpen);
-  };
-
-  const handleMarkAsRead = (notificationId) => {
-    markAsRead(notificationId);
   };
 
   const formatTime = (timestamp) => {
@@ -67,7 +66,6 @@ export default function NotificationBell() {
                   className={`notification-item ${
                     !notification.isRead ? "unread" : ""
                   }`}
-                  onClick={() => handleMarkAsRead(notification.id)}
                 >
                   <div className="notification-content">
                     <p>{notification.message}</p>

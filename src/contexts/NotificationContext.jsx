@@ -1,11 +1,26 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { initializePusher } from "../utils/pusher";
+import ToastContainer from "../components/ToastContainer";
 
 const NotificationContext = createContext();
+const STORAGE_KEY = "2do_notifications";
 
 export function NotificationProvider({ children }) {
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Initialize notifications from localStorage
+  const [notifications, setNotifications] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [toasts, setToasts] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved).filter((n) => !n.isRead).length : 0;
+  });
+
+  // Save notifications to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+  }, [notifications]);
 
   useEffect(() => {
     // Initialize Pusher and bind to notifications
@@ -28,8 +43,10 @@ export function NotificationProvider({ children }) {
       }
     });
 
-    // Fetch existing notifications
-    fetchNotifications();
+    // Fetch existing notifications only if localStorage is empty
+    if (notifications.length === 0) {
+      fetchNotifications();
+    }
 
     // Cleanup Pusher subscription on unmount
     return () => {
@@ -77,6 +94,13 @@ export function NotificationProvider({ children }) {
     }
   };
 
+  const markAllAsRead = () => {
+    setNotifications((prev) =>
+      prev.map((notification) => ({ ...notification, isRead: true }))
+    );
+    setUnreadCount(0);
+  };
+
   const clearNotifications = async () => {
     try {
       const response = await fetch(
@@ -91,6 +115,7 @@ export function NotificationProvider({ children }) {
       const data = await response.json();
       if (data.success) {
         setNotifications([]);
+        localStorage.removeItem(STORAGE_KEY);
         setUnreadCount(0);
       }
     } catch (error) {
@@ -98,7 +123,8 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  const showNotification = (message, type) => {
+  const showNotification = (message, type = "info") => {
+    // Create persistent notification in the list
     const notification = {
       id: Date.now(),
       message,
@@ -108,6 +134,23 @@ export function NotificationProvider({ children }) {
     };
     setNotifications((prev) => [notification, ...prev]);
     setUnreadCount((prev) => prev + 1);
+
+    // Create temporary toast notification
+    const toast = {
+      id: Date.now() + 1, // Ensure unique ID
+      message,
+      type,
+    };
+    setToasts((prev) => [toast, ...prev].slice(0, 3)); // Keep max 3 toasts
+
+    // Auto-remove toast after 3 seconds
+    setTimeout(() => {
+      removeToast(toast.id);
+    }, 3000);
+  };
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
 
   return (
@@ -116,11 +159,13 @@ export function NotificationProvider({ children }) {
         notifications,
         unreadCount,
         markAsRead,
+        markAllAsRead,
         clearNotifications,
         showNotification,
       }}
     >
       {children}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </NotificationContext.Provider>
   );
 }

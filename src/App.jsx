@@ -20,29 +20,9 @@ function App() {
   const [isTaskInputVisible, setIsTaskInputVisible] = useState(false);
   const { showNotification } = useNotifications();
 
+  // Load todos when component mounts
   useEffect(() => {
     loadTodos();
-
-    // Add click handler to clear selected task when clicking outside
-    const handleClickOutside = (event) => {
-      const taskElements = document.querySelectorAll(".task-item, .task-input");
-      let clickedInside = false;
-
-      taskElements.forEach((element) => {
-        if (element.contains(event.target)) {
-          clickedInside = true;
-        }
-      });
-
-      if (!clickedInside) {
-        setSelectedTask(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
   }, []);
 
   const loadTodos = async () => {
@@ -474,12 +454,14 @@ function App() {
 
         <TodoList
           todos={filteredTodos}
-          onToggle={toggleTodo}
-          onDelete={deleteTask}
+          toggleTodo={toggleTodo}
+          toggleImportant={toggleImportant}
           onSelectTask={handleSelectTask}
+          onUpdateTask={updateTask}
+          onDeleteTask={deleteTask}
+          selectedTask={selectedTask}
           filter={filter}
           searchQuery={searchQuery}
-          selectedTask={selectedTask}
           onFilterChange={handleFilterChange}
           onSearchChange={setSearchQuery}
         />
