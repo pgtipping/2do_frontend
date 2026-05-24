@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { FaCheck, FaExclamationTriangle, FaFileImport } from "react-icons/fa";
 import { createDefaultCategories, findCategoryBySuggestion } from "../defaultCategories";
 import { createFinanceRepository } from "../storage/localFinanceStore";
+import { extractTextFromPdfFile } from "../imports/pdfTextExtractor";
 import { parseTdBankStatementText } from "../imports/tdBankStatementParser";
 import { createReviewedImportDraft } from "../imports/reviewedImportDraft";
 import "./FinanceImportScreen.css";
@@ -50,6 +51,7 @@ export default function FinanceImportScreen() {
   const [draft, setDraft] = useState(null);
   const [saveResult, setSaveResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [pdfStatus, setPdfStatus] = useState("");
   const [selectedRows, setSelectedRows] = useState(new Set());
   const categories = useMemo(() => createDefaultCategories(), []);
   const repository = useMemo(() => createFinanceRepository(), []);
@@ -73,6 +75,31 @@ export default function FinanceImportScreen() {
       setDraft(null);
       setSelectedRows(new Set());
       setErrorMessage(error.message || "Statement could not be parsed.");
+    }
+  };
+
+  const importPdf = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setErrorMessage("");
+    setPdfStatus(`Reading ${file.name}...`);
+
+    try {
+      const extractedText = await extractTextFromPdfFile(file);
+      setStatementText(extractedText);
+      setDraft(null);
+      setSelectedRows(new Set());
+      setSaveResult(null);
+      setPdfStatus(`Extracted text from ${file.name}. Review it, then parse.`);
+    } catch (error) {
+      setPdfStatus("");
+      setErrorMessage(error.message || "PDF text could not be extracted.");
+    } finally {
+      event.target.value = "";
     }
   };
 
@@ -144,13 +171,24 @@ export default function FinanceImportScreen() {
               <p className="eyebrow">Statement Text</p>
               <h2>TD Bank Source</h2>
             </div>
-            <button
-              className="ghost-action"
-              type="button"
-              onClick={() => setStatementText("")}
-            >
-              Clear
-            </button>
+            <div className="source-actions">
+              <label className="file-action">
+                <input
+                  accept="application/pdf"
+                  aria-label="Upload TD Bank PDF statement"
+                  type="file"
+                  onChange={importPdf}
+                />
+                Upload PDF
+              </label>
+              <button
+                className="ghost-action"
+                type="button"
+                onClick={() => setStatementText("")}
+              >
+                Clear
+              </button>
+            </div>
           </div>
           <textarea
             aria-label="TD Bank statement text"
@@ -158,6 +196,7 @@ export default function FinanceImportScreen() {
             onChange={(event) => setStatementText(event.target.value)}
             spellCheck="false"
           />
+          {pdfStatus ? <p className="pdf-status">{pdfStatus}</p> : null}
           {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
         </div>
 

@@ -84,6 +84,36 @@
   color: #304239;
 }
 
+.source-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.file-action {
+  align-items: center;
+  background: #1f5a41;
+  border: 1px solid #1f5a41;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.file-action input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
 .import-workspace {
   display: grid;
   gap: 18px;
@@ -147,6 +177,7 @@
 }
 
 .error-message,
+.pdf-status,
 .save-result {
   border-radius: 8px;
   font-size: 14px;
@@ -157,6 +188,11 @@
 .error-message {
   background: #fff1f1;
   color: #9f1d1d;
+}
+
+.pdf-status {
+  background: #eef6ff;
+  color: #225378;
 }
 
 .save-result {
@@ -348,6 +384,11 @@
 
   .review-row {
     grid-template-columns: 1fr;
+  }
+
+  .source-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .row-amount {
