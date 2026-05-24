@@ -57,3 +57,48 @@ export function calculateCategorySpending(transactions, { month } = {}) {
       return totals;
     }, {});
 }
+
+export function calculateMonthlyCashflow(transactions) {
+  const months = Array.from(
+    new Set(transactions.map((transaction) => getMonthKey(transaction.date)))
+  ).sort();
+
+  return months.map((month) => calculateMonthlySummary(transactions, { month }));
+}
+
+function daysBetween(startDate, endDate) {
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const start = new Date(`${startDate}T00:00:00.000`);
+  const end = new Date(`${endDate}T00:00:00.000`);
+
+  return Math.round((end - start) / millisecondsPerDay);
+}
+
+export function getUpcomingSubscriptions(
+  subscriptions,
+  { today, daysAhead = 30 } = {}
+) {
+  return subscriptions
+    .filter((subscription) => subscription.status === "active")
+    .map((subscription) => ({
+      ...subscription,
+      daysUntilRenewal: daysBetween(today, subscription.nextRenewalDate),
+    }))
+    .filter(
+      (subscription) =>
+        subscription.daysUntilRenewal >= 0 &&
+        subscription.daysUntilRenewal <= daysAhead
+    )
+    .map((subscription) => ({
+      id: subscription.id,
+      name: subscription.name,
+      amount: subscription.amount,
+      nextRenewalDate: subscription.nextRenewalDate,
+      daysUntilRenewal: subscription.daysUntilRenewal,
+      isInReminderWindow:
+        subscription.daysUntilRenewal <= subscription.reminderDaysBefore,
+    }))
+    .sort((first, second) =>
+      first.nextRenewalDate.localeCompare(second.nextRenewalDate)
+    );
+}
