@@ -39,3 +39,10 @@ test("matches parser category suggestions to default categories", () => {
   assert.equal(findCategoryBySuggestion(categories, "unknown"), null);
   assert.equal(findCategoryBySuggestion(categories, null), null);
 });
+
+test("creates default categories without an injected clock", () => {
+  const categories = createDefaultCategories();
+
+  assert.equal(categories.length, 9);
+  assert.match(categories[0].createdAt, /^\d{4}-\d{2}-\d{2}T/);
+});
