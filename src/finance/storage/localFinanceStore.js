@@ -134,6 +134,42 @@ export function createFinanceRepository({
     };
   };
 
+  const saveReviewedImport = async ({ importBatch, rows }) => {
+    const data = await loadData();
+    let createdTransactionCount = 0;
+    let duplicateTransactionCount = 0;
+
+    rows.forEach((row) => {
+      const transaction = row.transaction;
+      const isDuplicate =
+        transaction.importFingerprint &&
+        data.transactions.some(
+          (currentTransaction) =>
+            currentTransaction.importFingerprint === transaction.importFingerprint
+        );
+
+      if (isDuplicate) {
+        duplicateTransactionCount += 1;
+        return;
+      }
+
+      data.transactions.push(transaction);
+      createdTransactionCount += 1;
+    });
+
+    const savedImportBatch = {
+      ...importBatch,
+      rowCount: rows.length,
+      createdTransactionCount,
+      duplicateTransactionCount,
+    };
+
+    data.importBatches.push(savedImportBatch);
+    await saveData(data);
+
+    return savedImportBatch;
+  };
+
   return {
     now,
     createId,
@@ -144,5 +180,6 @@ export function createFinanceRepository({
     saveSubscription: (subscription) => saveRecord("subscriptions", subscription),
     saveImportBatch: (importBatch) => saveRecord("importBatches", importBatch),
     saveTransaction,
+    saveReviewedImport,
   };
 }
