@@ -1,0 +1,26 @@
+# Validated Project Rules
+
+## 2026-05-25 18:06:50 - Memory bank startup order
+
+Read these files before starting project work:
+
+1. `memory-bank/.Cascaderules`
+2. `memory-bank/activeContext.md`
+3. `memory-bank/_index.md`
+4. `memory-bank/next-steps.md`
+
+Use `_index.md` to decide whether to read one or two topic files.
+
+## 2026-05-25 18:06:50 - Finance app direction
+
+This repository is being converted from a todo app into a local-first personal finance app.
+
+The first useful product path is:
+
+1. Import TD Bank PDF statement activity.
+2. Review and label imported rows before saving.
+3. See saved transactions in a ledger.
+4. See monthly reports.
+5. Export backups.
+
+Keep storage local-first and compatible with possible future bank sync.

@@ -1,0 +1,34 @@
+# Progress
+
+## 2026-05-25 18:06:50 - Finance foundation shipped
+
+Completed before memory bank creation:
+
+- Added sync-ready finance domain objects for accounts, categories, transactions, subscriptions, import batches, and category rules.
+- Added local-first repository backed by IndexedDB in the browser, with memory driver for tests.
+- Added TD Bank statement parser for the known statement format.
+- Added PDF text extraction for statement uploads.
+- Added reviewed import draft creation with row status and reconciliation checks.
+- Added default finance categories.
+- Added report helpers for monthly summary, category spending, monthly cashflow, and upcoming subscriptions.
+- Added backup helpers for JSON backup restore and CSV transaction export.
+
+## 2026-05-25 18:06:50 - Workspace tabs shipped
+
+Commit `3f77ee3 feat: add finance workspace tabs` added:
+
+- Import, Ledger, and Reports tabs.
+- Category dropdowns on import review rows.
+- Learned category rules from saved labels.
+- Automatic learned category application in future import drafts.
+- Ledger month view with transaction rows.
+- Dashboard-style Reports view.
+- CSV and JSON backup buttons.
+- Favicon and ignored temporary browser/tool folders.
+
+Verification for that commit:
+
+- 26 finance tests passed.
+- Vite production build passed.
+- Browser checks passed on desktop and mobile.
+- Commit was pushed to `origin/main`.
