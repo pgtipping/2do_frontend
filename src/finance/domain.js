@@ -8,6 +8,7 @@ export function createDefaultFinanceData() {
     accounts: [],
     transactions: [],
     categories: [],
+    categoryRules: [],
     subscriptions: [],
     importBatches: [],
   };
@@ -67,6 +68,26 @@ export function createCategory({
     color,
     sortOrder,
     createdAt: now(),
+    archivedAt: null,
+  };
+}
+
+export function createCategoryRule({
+  createId: makeId = createId,
+  now = getCurrentTimestamp,
+  categoryId,
+  sourceText,
+  matchText = sourceText,
+} = {}) {
+  const timestamp = now();
+
+  return {
+    id: makeId("rule"),
+    categoryId,
+    sourceText,
+    matchText,
+    createdAt: timestamp,
+    updatedAt: timestamp,
     archivedAt: null,
   };
 }

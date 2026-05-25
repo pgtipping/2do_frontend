@@ -1,8 +1,10 @@
 import {
+  createCategoryRule,
   createDefaultFinanceData,
   createId as defaultCreateId,
   getCurrentTimestamp,
 } from "../domain.js";
+import { getCategoryRuleText } from "../categoryRules.js";
 
 const FINANCE_DATA_KEY = "finance_app_data_v1";
 const DATABASE_NAME = "personal_finance_app";
@@ -83,7 +85,10 @@ export function createFinanceRepository({
 } = {}) {
   const loadData = async () => {
     const data = await driver.load();
-    return data || createDefaultFinanceData();
+    return {
+      ...createDefaultFinanceData(),
+      ...(data || {}),
+    };
   };
 
   const saveData = async (data) => driver.save(data);
@@ -155,6 +160,29 @@ export function createFinanceRepository({
 
       data.transactions.push(transaction);
       createdTransactionCount += 1;
+
+      const matchText = getCategoryRuleText(transaction);
+      const hasRule =
+        transaction.categoryId &&
+        matchText &&
+        data.categoryRules.some(
+          (rule) =>
+            !rule.archivedAt &&
+            rule.categoryId === transaction.categoryId &&
+            rule.matchText === matchText
+        );
+
+      if (transaction.categoryId && matchText && !hasRule) {
+        data.categoryRules.push(
+          createCategoryRule({
+            createId,
+            now,
+            categoryId: transaction.categoryId,
+            sourceText: transaction.rawNarration || transaction.description,
+            matchText,
+          })
+        );
+      }
     });
 
     const savedImportBatch = {
@@ -177,6 +205,8 @@ export function createFinanceRepository({
     saveData,
     saveAccount: (account) => saveRecord("accounts", account),
     saveCategory: (category) => saveRecord("categories", category),
+    saveCategoryRule: (categoryRule) =>
+      saveRecord("categoryRules", categoryRule),
     saveSubscription: (subscription) => saveRecord("subscriptions", subscription),
     saveImportBatch: (importBatch) => saveRecord("importBatches", importBatch),
     saveTransaction,

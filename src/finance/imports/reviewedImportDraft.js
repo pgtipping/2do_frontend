@@ -1,4 +1,8 @@
 import { createImportBatch, createTransaction } from "../domain.js";
+import {
+  findCategoryById,
+  findCategoryRuleForTransaction,
+} from "../categoryRules.js";
 
 function hasReconciliationIssue(reconciliation = []) {
   return reconciliation.some((item) => item.status !== "matched");
@@ -26,6 +30,8 @@ export function createReviewedImportDraft({
   accountId,
   fileName,
   parsedStatement,
+  categories = [],
+  categoryRules = [],
   now,
   createId,
 }) {
@@ -34,6 +40,21 @@ export function createReviewedImportDraft({
   );
   const rows = parsedStatement.transactions.map((parsedTransaction) => {
     const reviewReasons = getReviewReasons(parsedTransaction, reconciliationIssue);
+    const learnedRule = findCategoryRuleForTransaction(
+      categoryRules,
+      parsedTransaction
+    );
+    const learnedCategory = findCategoryById(
+      categories,
+      learnedRule?.categoryId
+    );
+    const parserCategory =
+      categories.find(
+        (category) =>
+          category.name.toLowerCase() ===
+          String(parsedTransaction.categorySuggestion || "").toLowerCase()
+      ) || null;
+    const appliedCategory = learnedCategory || parserCategory;
     const transaction = createTransaction({
       createId,
       now,
@@ -44,7 +65,7 @@ export function createReviewedImportDraft({
       amount: parsedTransaction.amount,
       type: parsedTransaction.type,
       counterpartyType: parsedTransaction.counterpartyType,
-      categoryId: null,
+      categoryId: appliedCategory?.id || null,
       source: parsedTransaction.source,
       rawNarration: parsedTransaction.rawNarration,
       importFingerprint: parsedTransaction.importFingerprint,
@@ -54,7 +75,9 @@ export function createReviewedImportDraft({
       id: createId("review"),
       status: reviewReasons.length > 0 ? "needs_review" : "ready",
       confidence: parsedTransaction.confidence,
-      categorySuggestion: parsedTransaction.categorySuggestion || null,
+      categorySuggestion:
+        learnedCategory?.name || parsedTransaction.categorySuggestion || null,
+      categorySource: learnedCategory ? "learned" : parserCategory ? "parser" : null,
       reviewReasons,
       transaction,
     };

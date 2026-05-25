@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { createReviewedImportDraft } from "../reviewedImportDraft.js";
+import { createCategory, createCategoryRule } from "../../domain.js";
 
 test("creates review rows from parsed TD Bank transactions", () => {
   const draft = createReviewedImportDraft({
@@ -59,6 +60,54 @@ test("creates review rows from parsed TD Bank transactions", () => {
     "Parser marked this row for review.",
     "Low confidence classification.",
   ]);
+});
+
+test("applies a learned category rule to future import drafts", () => {
+  const categories = [
+    createCategory({
+      createId: () => "cat_insurance",
+      now: () => "2026-05-24T10:00:00.000Z",
+      name: "Insurance",
+      type: "expense",
+    }),
+  ];
+  const categoryRules = [
+    createCategoryRule({
+      createId: () => "rule_geico",
+      now: () => "2026-05-24T10:00:00.000Z",
+      categoryId: "cat_insurance",
+      sourceText: "ELECTRONICPMT-WEB GEICO",
+    }),
+  ];
+  const draft = createReviewedImportDraft({
+    accountId: "acct_checking",
+    fileName: "td-february.pdf",
+    now: () => "2026-05-24T10:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+    categories,
+    categoryRules,
+    parsedStatement: {
+      transactions: [
+        {
+          date: "2025-02-02",
+          description: "ELECTRONICPMT-WEB GEICO",
+          amount: -128.44,
+          type: "expense",
+          counterpartyType: "unknown",
+          confidence: "low",
+          needsReview: true,
+          source: "td_bank_pdf",
+          rawNarration: "ELECTRONICPMT-WEB GEICO",
+          importFingerprint: "td:2025-02-02:geico:128.44",
+        },
+      ],
+      reconciliation: [],
+    },
+  });
+
+  assert.equal(draft.rows[0].transaction.categoryId, "cat_insurance");
+  assert.equal(draft.rows[0].categorySuggestion, "Insurance");
+  assert.equal(draft.rows[0].categorySource, "learned");
 });
 
 test("marks all rows for review when statement reconciliation does not match", () => {

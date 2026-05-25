@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   createAccount,
+  createCategoryRule,
   createCategory,
   createDefaultFinanceData,
   createTransaction,
@@ -12,6 +13,10 @@ import {
   createFinanceRepository,
   createMemoryStorageDriver,
 } from "../storage/localFinanceStore.js";
+import {
+  findCategoryRuleForTransaction,
+  normalizeCategoryRuleText,
+} from "../categoryRules.js";
 
 test("default finance data starts with sync-ready collections", () => {
   const data = createDefaultFinanceData();
@@ -20,11 +25,30 @@ test("default finance data starts with sync-ready collections", () => {
   assert.deepEqual(Object.keys(data).sort(), [
     "accounts",
     "categories",
+    "categoryRules",
     "importBatches",
     "schemaVersion",
     "subscriptions",
     "transactions",
   ]);
+});
+
+test("category rules normalize bank narration for future matching", () => {
+  const rule = createCategoryRule({
+    createId: () => "rule_geico",
+    now: () => "2026-05-24T06:00:00.000Z",
+    categoryId: "cat_insurance",
+    sourceText: "ELECTRONICPMT-WEB GEICO  128.44",
+  });
+  const match = findCategoryRuleForTransaction([rule], {
+    rawNarration: "ElectronicPmt-Web   GEICO",
+  });
+
+  assert.equal(
+    normalizeCategoryRuleText("ElectronicPmt-Web   GEICO"),
+    "ELECTRONICPMT WEB GEICO"
+  );
+  assert.equal(match.categoryId, "cat_insurance");
 });
 
 test("repository saves sync-ready account, category, and transaction records", async () => {
@@ -176,6 +200,53 @@ test("repository saves reviewed import batches with created and duplicate counts
     createdTransactionCount: 1,
     duplicateTransactionCount: 1,
   });
+});
+
+test("repository remembers reviewed transaction labels as future import rules", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const transaction = createTransaction({
+    createId: repository.createId,
+    now: repository.now,
+    accountId: "acct_1",
+    categoryId: "cat_insurance",
+    date: "2025-01-02",
+    description: "ELECTRONICPMT-WEB GEICO",
+    amount: -128.44,
+    type: "expense",
+    source: "td_bank_pdf",
+    rawNarration: "ELECTRONICPMT-WEB GEICO",
+    importFingerprint: "td-geico-2025-01-02-128.44",
+  });
+
+  await repository.saveReviewedImport({
+    importBatch: {
+      id: "batch_1",
+      source: "td_bank_pdf",
+      importedAt: "2026-05-24T06:00:00.000Z",
+      fileName: "td.pdf",
+      rowCount: 1,
+      createdTransactionCount: 0,
+      duplicateTransactionCount: 0,
+    },
+    rows: [
+      {
+        status: "ready",
+        transaction,
+      },
+    ],
+  });
+  const saved = await repository.loadData();
+  const match = findCategoryRuleForTransaction(saved.categoryRules, {
+    rawNarration: "ELECTRONICPMT-WEB GEICO",
+  });
+
+  assert.equal(saved.categoryRules.length, 1);
+  assert.equal(saved.categoryRules[0].categoryId, "cat_insurance");
+  assert.equal(match.categoryId, "cat_insurance");
 });
 
 test("monthly summary counts transfers to others as spend and hides self-transfers by default", () => {

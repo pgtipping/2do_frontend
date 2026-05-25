@@ -42,4 +42,6 @@ yarn-error.log*
 .cache/
 .next/
 .nuxt/
+.playwright-mcp/
+.superpowers/
 .npm/ 
