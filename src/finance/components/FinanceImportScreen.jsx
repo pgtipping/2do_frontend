@@ -7,9 +7,11 @@ import {
   FaExclamationTriangle,
   FaFileImport,
   FaListUl,
+  FaTags,
   FaTrash,
 } from "react-icons/fa";
 import { createDefaultCategories } from "../defaultCategories";
+import { createCategory } from "../domain";
 import { createFinanceRepository } from "../storage/localFinanceStore";
 import { extractTextFromPdfFile } from "../imports/pdfTextExtractor";
 import { parseTdBankStatementText } from "../imports/tdBankStatementParser";
@@ -45,6 +47,12 @@ RENT PAYMENT 800.00
 12/22 WALMART STORE 42.91
 01/02 ELECTRONICPMT-WEB CREDIT CARD 55.00
 Subtotal: 897.91`;
+
+const DEFAULT_CATEGORY_FORM = {
+  color: "#406f59",
+  name: "",
+  type: "expense",
+};
 
 function createStableId(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -98,10 +106,16 @@ export default function FinanceImportScreen() {
   const [editingTransactionId, setEditingTransactionId] = useState(null);
   const [transactionForm, setTransactionForm] = useState(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
+  const [newCategoryForm, setNewCategoryForm] = useState(DEFAULT_CATEGORY_FORM);
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [categoryForm, setCategoryForm] = useState(DEFAULT_CATEGORY_FORM);
+  const [pendingCategoryApply, setPendingCategoryApply] = useState(null);
   const defaultCategories = useMemo(() => createDefaultCategories(), []);
   const repository = useMemo(() => createFinanceRepository(), []);
   const categories =
     financeData?.categories?.length > 0 ? financeData.categories : defaultCategories;
+  const visibleCategories = categories.filter((category) => !category.archivedAt);
+  const hiddenCategories = categories.filter((category) => category.archivedAt);
   const transactions = financeData?.transactions || [];
   const subscriptions = financeData?.subscriptions || [];
   const categoryRules = financeData?.categoryRules || [];
@@ -238,6 +252,7 @@ export default function FinanceImportScreen() {
   const cancelEditingTransaction = () => {
     setEditingTransactionId(null);
     setTransactionForm(null);
+    setPendingCategoryApply(null);
   };
 
   const updateTransactionForm = (fieldName, value) => {
@@ -252,13 +267,57 @@ export default function FinanceImportScreen() {
       return;
     }
 
-    await repository.updateTransaction(transactionId, {
+    const currentTransaction = transactions.find(
+      (transaction) => transaction.id === transactionId
+    );
+    const nextCategoryId = transactionForm.categoryId || null;
+    const transactionUpdates = {
       categoryId: transactionForm.categoryId || null,
       description: transactionForm.description.trim(),
       merchant: transactionForm.merchant.trim() || null,
       notes: transactionForm.notes.trim(),
       type: transactionForm.type,
+    };
+    const categoryChanged =
+      currentTransaction && (currentTransaction.categoryId || null) !== nextCategoryId;
+
+    if (categoryChanged) {
+      const similarTransactions = await repository.findSimilarTransactions(transactionId);
+
+      if (similarTransactions.length > 1) {
+        setPendingCategoryApply({
+          categoryId: nextCategoryId,
+          matchLabel:
+            currentTransaction.merchant ||
+            currentTransaction.rawNarration ||
+            currentTransaction.description,
+          similarCount: similarTransactions.length,
+          transactionId,
+          updates: transactionUpdates,
+        });
+        return;
+      }
+    }
+
+    await repository.updateTransaction(transactionId, transactionUpdates);
+    cancelEditingTransaction();
+    await loadFinanceData();
+  };
+
+  const applyPendingCategoryChange = async (scope) => {
+    if (!pendingCategoryApply) {
+      return;
+    }
+
+    await repository.applyTransactionCategoryChange({
+      transactionId: pendingCategoryApply.transactionId,
+      categoryId: pendingCategoryApply.categoryId,
+      scope,
     });
+    await repository.updateTransaction(
+      pendingCategoryApply.transactionId,
+      pendingCategoryApply.updates
+    );
     cancelEditingTransaction();
     await loadFinanceData();
   };
@@ -273,6 +332,81 @@ export default function FinanceImportScreen() {
 
     await repository.deleteTransaction(transactionId);
     setConfirmingDeleteId(null);
+    await loadFinanceData();
+  };
+
+  const updateNewCategoryForm = (fieldName, value) => {
+    setNewCategoryForm((currentForm) => ({
+      ...currentForm,
+      [fieldName]: value,
+    }));
+  };
+
+  const updateCategoryForm = (fieldName, value) => {
+    setCategoryForm((currentForm) => ({
+      ...currentForm,
+      [fieldName]: value,
+    }));
+  };
+
+  const createCustomCategory = async () => {
+    const categoryName = newCategoryForm.name.trim();
+
+    if (!categoryName) {
+      return;
+    }
+
+    await repository.saveCategory(
+      createCategory({
+        createId: repository.createId,
+        now: repository.now,
+        name: categoryName,
+        type: newCategoryForm.type,
+        color: newCategoryForm.color,
+        sortOrder: categories.length,
+      })
+    );
+    setNewCategoryForm(DEFAULT_CATEGORY_FORM);
+    await loadFinanceData();
+  };
+
+  const startEditingCategory = (category) => {
+    setEditingCategoryId(category.id);
+    setCategoryForm({
+      color: category.color,
+      name: category.name,
+      type: category.type,
+    });
+  };
+
+  const cancelEditingCategory = () => {
+    setEditingCategoryId(null);
+    setCategoryForm(DEFAULT_CATEGORY_FORM);
+  };
+
+  const saveCategoryEdit = async (categoryId) => {
+    const categoryName = categoryForm.name.trim();
+
+    if (!categoryName) {
+      return;
+    }
+
+    await repository.updateCategory(categoryId, {
+      color: categoryForm.color,
+      name: categoryName,
+      type: categoryForm.type,
+    });
+    cancelEditingCategory();
+    await loadFinanceData();
+  };
+
+  const archiveCategory = async (categoryId) => {
+    await repository.archiveCategory(categoryId);
+    await loadFinanceData();
+  };
+
+  const restoreCategory = async (categoryId) => {
+    await repository.restoreCategory(categoryId);
     await loadFinanceData();
   };
 
@@ -328,6 +462,10 @@ export default function FinanceImportScreen() {
   const categoryById = new Map(
     categories.map((category) => [category.id, category])
   );
+  const getSelectableCategories = (selectedCategoryId) =>
+    categories.filter(
+      (category) => !category.archivedAt || category.id === selectedCategoryId
+    );
 
   return (
     <main className="finance-shell">
@@ -372,6 +510,14 @@ export default function FinanceImportScreen() {
         >
           <FaChartPie aria-hidden="true" />
           Reports
+        </button>
+        <button
+          className={activeTab === "categories" ? "active" : ""}
+          type="button"
+          onClick={() => setActiveTab("categories")}
+        >
+          <FaTags aria-hidden="true" />
+          Categories
         </button>
       </nav>
 
@@ -473,7 +619,7 @@ export default function FinanceImportScreen() {
                       }
                     >
                       <option value="">Uncategorized</option>
-                      {categories.map((category) => (
+                      {visibleCategories.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
                         </option>
@@ -620,7 +766,9 @@ export default function FinanceImportScreen() {
                               }
                             >
                               <option value="">Uncategorized</option>
-                              {categories.map((category) => (
+                              {getSelectableCategories(
+                                transaction.categoryId
+                              ).map((category) => (
                                 <option key={category.id} value={category.id}>
                                   {category.name}
                                 </option>
@@ -654,6 +802,43 @@ export default function FinanceImportScreen() {
                             Cancel
                           </button>
                         </div>
+                        {pendingCategoryApply?.transactionId === transaction.id ? (
+                          <div className="smart-apply-panel">
+                            <p>
+                              Found {pendingCategoryApply.similarCount} similar
+                              transactions for {pendingCategoryApply.matchLabel}.
+                            </p>
+                            <div>
+                              <button
+                                className="ghost-action compact"
+                                type="button"
+                                onClick={() => applyPendingCategoryChange("single")}
+                              >
+                                This transaction
+                              </button>
+                              <button
+                                className="ghost-action compact"
+                                type="button"
+                                onClick={() =>
+                                  applyPendingCategoryChange("matching_past")
+                                }
+                              >
+                                Matching past
+                              </button>
+                              <button
+                                className="primary-action compact"
+                                type="button"
+                                onClick={() =>
+                                  applyPendingCategoryChange(
+                                    "matching_past_and_future"
+                                  )
+                                }
+                              >
+                                Past and future
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                       </>
                     ) : (
                       <>
@@ -707,6 +892,201 @@ export default function FinanceImportScreen() {
               Save an import to start filling the ledger.
             </div>
           )}
+        </section>
+      ) : null}
+
+      {activeTab === "categories" ? (
+        <section className="categories-workspace">
+          <div className="category-layout">
+            <section className="category-editor-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Categories</p>
+                  <h2>Create category</h2>
+                </div>
+              </div>
+              <div className="category-form-grid">
+                <label>
+                  Name
+                  <input
+                    value={newCategoryForm.name}
+                    onChange={(event) =>
+                      updateNewCategoryForm("name", event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Type
+                  <select
+                    value={newCategoryForm.type}
+                    onChange={(event) =>
+                      updateNewCategoryForm("type", event.target.value)
+                    }
+                  >
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="mixed">Mixed</option>
+                  </select>
+                </label>
+                <label>
+                  Color
+                  <input
+                    type="color"
+                    value={newCategoryForm.color}
+                    onChange={(event) =>
+                      updateNewCategoryForm("color", event.target.value)
+                    }
+                  />
+                </label>
+                <button
+                  className="primary-action"
+                  type="button"
+                  onClick={createCustomCategory}
+                  disabled={!newCategoryForm.name.trim()}
+                >
+                  Add category
+                </button>
+              </div>
+            </section>
+
+            <section className="category-list-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Active</p>
+                  <h2>{visibleCategories.length} available categories</h2>
+                </div>
+              </div>
+              <div className="category-list">
+                {visibleCategories.map((category) => {
+                  const isEditingCategory = editingCategoryId === category.id;
+
+                  return (
+                    <article className="category-row" key={category.id}>
+                      <span
+                        className="category-color"
+                        style={{ background: category.color }}
+                        aria-hidden="true"
+                      />
+                      {isEditingCategory ? (
+                        <>
+                          <div className="category-form-grid inline">
+                            <label>
+                              Name
+                              <input
+                                value={categoryForm.name}
+                                onChange={(event) =>
+                                  updateCategoryForm("name", event.target.value)
+                                }
+                              />
+                            </label>
+                            <label>
+                              Type
+                              <select
+                                value={categoryForm.type}
+                                onChange={(event) =>
+                                  updateCategoryForm("type", event.target.value)
+                                }
+                              >
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                                <option value="transfer">Transfer</option>
+                                <option value="mixed">Mixed</option>
+                              </select>
+                            </label>
+                            <label>
+                              Color
+                              <input
+                                type="color"
+                                value={categoryForm.color}
+                                onChange={(event) =>
+                                  updateCategoryForm("color", event.target.value)
+                                }
+                              />
+                            </label>
+                          </div>
+                          <div className="transaction-actions">
+                            <button
+                              className="primary-action compact"
+                              type="button"
+                              onClick={() => saveCategoryEdit(category.id)}
+                            >
+                              Save
+                            </button>
+                            <button
+                              className="ghost-action compact"
+                              type="button"
+                              onClick={cancelEditingCategory}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <strong>{category.name}</strong>
+                            <span>{formatType(category.type)}</span>
+                          </div>
+                          <div className="transaction-actions">
+                            <button
+                              className="ghost-action compact"
+                              type="button"
+                              onClick={() => startEditingCategory(category)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="ghost-action compact"
+                              type="button"
+                              onClick={() => archiveCategory(category.id)}
+                            >
+                              Hide
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="category-list-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Hidden</p>
+                  <h2>{hiddenCategories.length} retired categories</h2>
+                </div>
+              </div>
+              {hiddenCategories.length > 0 ? (
+                <div className="category-list">
+                  {hiddenCategories.map((category) => (
+                    <article className="category-row muted" key={category.id}>
+                      <span
+                        className="category-color"
+                        style={{ background: category.color }}
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <strong>{category.name}</strong>
+                        <span>{formatType(category.type)}</span>
+                      </div>
+                      <button
+                        className="ghost-action compact"
+                        type="button"
+                        onClick={() => restoreCategory(category.id)}
+                      >
+                        Restore
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted-copy">No hidden categories.</p>
+              )}
+            </section>
+          </div>
         </section>
       ) : null}
 

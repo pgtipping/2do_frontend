@@ -55,3 +55,19 @@ Use guided tabs for the first practical app shape:
 - Reports
 
 Reports should look like the dashboard-style option discussed during visual planning, but it should live inside the Reports tab rather than replacing the whole app home screen.
+
+## 2026-05-26 18:04:00 - Smart category cleanup
+
+Ledger category edits should not automatically rewrite future category rules.
+
+When similar transactions exist, the app should ask how broadly to apply the category change:
+
+- This transaction only.
+- Matching past transactions.
+- Matching past and future transactions.
+
+This keeps the app smart without silently rewriting spending history.
+
+Renaming a category keeps history together because the category identity stays the same.
+
+Hiding a category retires it from future assignment lists, but old transactions still show and report under that category.

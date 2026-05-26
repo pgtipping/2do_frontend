@@ -1,28 +1,29 @@
 # Next Steps
 
-## 2026-05-26 03:12:02 - Active resumption path
+## 2026-05-26 18:04:00 - Active resumption path
 
-Recommended next step: commit the Ledger edit/delete work, then add category management.
+Recommended next step: push the local commits when approved, then add subscription create/edit/delete.
 
 Why this is next:
 
-- Ledger transaction edit/delete is implemented locally.
-- Finance tests and production build pass.
-- Codex in-app browser smoke test passed against the production `dist` build.
-- Category management is the next product gap after saved transaction cleanup.
+- Ledger edit/delete is committed locally.
+- Category management is committed locally.
+- Finance tests, production build, `git diff --check`, and Playwright browser smoke test pass.
+- Subscription management is the next product gap after category cleanup.
 
 Build in this order:
 
-1. Commit the Ledger edit/delete work.
-2. Add category management for create, rename, hide/archive, and color changes.
-3. Add focused tests for category management behavior.
-4. Re-run finance tests, production build, and browser checks.
+1. Push the local commits when approved.
+2. Add subscription create/edit/delete.
+3. Show real upcoming renewals in Reports from saved subscriptions.
+4. Add focused tests for subscription behavior.
+5. Re-run finance tests, production build, and browser checks.
 
-After category management:
+After subscription management:
 
-1. Add subscription create/edit/delete and show real upcoming renewals.
-2. Add JSON restore import, not only JSON export.
-3. Improve README with current MVP behavior and screenshots.
+1. Add JSON restore import, not only JSON export.
+2. Improve README with current MVP behavior and screenshots.
+3. Consider a transaction search/filter pass for the Ledger.
 
 Current reminder:
 

@@ -249,6 +249,37 @@ test("repository remembers reviewed transaction labels as future import rules", 
   assert.equal(match.categoryId, "cat_insurance");
 });
 
+test("repository updates, hides, and restores categories", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const category = createCategory({
+    createId: () => "cat_coffee",
+    now: () => "2026-05-23T06:00:00.000Z",
+    name: "Coffee Shops",
+    type: "expense",
+    color: "#7c3aed",
+  });
+
+  await repository.saveCategory(category);
+  const updateResult = await repository.updateCategory("cat_coffee", {
+    name: "Dining",
+    color: "#be123c",
+  });
+  const archiveResult = await repository.archiveCategory("cat_coffee");
+  const restoreResult = await repository.restoreCategory("cat_coffee");
+  const saved = await repository.loadData();
+
+  assert.equal(updateResult.status, "updated");
+  assert.equal(archiveResult.record.archivedAt, "2026-05-24T06:00:00.000Z");
+  assert.equal(restoreResult.record.archivedAt, null);
+  assert.equal(saved.categories[0].name, "Dining");
+  assert.equal(saved.categories[0].color, "#be123c");
+  assert.equal(saved.categories[0].id, "cat_coffee");
+});
+
 test("repository updates saved transactions while preserving raw bank narration", async () => {
   const repository = createFinanceRepository({
     driver: createMemoryStorageDriver(),
@@ -289,7 +320,7 @@ test("repository updates saved transactions while preserving raw bank narration"
   assert.equal(saved.transactions[0].updatedAt, "2026-05-24T06:00:00.000Z");
 });
 
-test("repository updates learned category rule when edited category changes", async () => {
+test("repository does not learn future rules from a single transaction edit", async () => {
   const repository = createFinanceRepository({
     driver: createMemoryStorageDriver(),
     now: () => "2026-05-24T06:00:00.000Z",
@@ -313,18 +344,172 @@ test("repository updates learned category rule when edited category changes", as
   await repository.updateTransaction("txn_geico", {
     categoryId: "cat_insurance",
   });
-  await repository.updateTransaction("txn_geico", {
-    categoryId: "cat_bills",
+  const saved = await repository.loadData();
+
+  assert.equal(saved.categoryRules.length, 0);
+});
+
+test("repository applies category changes to similar past transactions", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const transactions = [
+    createTransaction({
+      createId: () => "txn_starbucks_one",
+      now: () => "2026-05-23T06:00:00.000Z",
+      accountId: "acct_1",
+      categoryId: "cat_coffee",
+      date: "2025-01-02",
+      description: "STARBUCKS STORE 1842",
+      merchant: "Starbucks",
+      amount: -6.5,
+      type: "expense",
+      rawNarration: "STARBUCKS STORE 1842",
+    }),
+    createTransaction({
+      createId: () => "txn_starbucks_two",
+      now: () => "2026-05-23T06:00:00.000Z",
+      accountId: "acct_1",
+      categoryId: "cat_coffee",
+      date: "2025-02-02",
+      description: "STARBUCKS STORE 2291",
+      merchant: "Starbucks",
+      amount: -8.75,
+      type: "expense",
+      rawNarration: "STARBUCKS STORE 2291",
+    }),
+    createTransaction({
+      createId: () => "txn_dunkin",
+      now: () => "2026-05-23T06:00:00.000Z",
+      accountId: "acct_1",
+      categoryId: "cat_coffee",
+      date: "2025-02-05",
+      description: "DUNKIN STORE",
+      merchant: "Dunkin",
+      amount: -4.25,
+      type: "expense",
+      rawNarration: "DUNKIN STORE",
+    }),
+  ];
+
+  for (const transaction of transactions) {
+    await repository.saveTransaction(transaction);
+  }
+  const similar = await repository.findSimilarTransactions("txn_starbucks_one");
+  const result = await repository.applyTransactionCategoryChange({
+    transactionId: "txn_starbucks_one",
+    categoryId: "cat_dining",
+    scope: "matching_past",
+  });
+  const saved = await repository.loadData();
+
+  assert.deepEqual(
+    similar.map((transactionRecord) => transactionRecord.id).sort(),
+    ["txn_starbucks_one", "txn_starbucks_two"]
+  );
+  assert.equal(result.updatedCount, 2);
+  assert.equal(result.learnedFutureRule, false);
+  assert.equal(
+    saved.transactions.find((item) => item.id === "txn_starbucks_one").categoryId,
+    "cat_dining"
+  );
+  assert.equal(
+    saved.transactions.find((item) => item.id === "txn_starbucks_two").categoryId,
+    "cat_dining"
+  );
+  assert.equal(
+    saved.transactions.find((item) => item.id === "txn_dunkin").categoryId,
+    "cat_coffee"
+  );
+  assert.equal(saved.categoryRules.length, 0);
+});
+
+test("repository matches similar raw bank narration when merchant is missing", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const firstTransaction = createTransaction({
+    createId: () => "txn_starbucks_one",
+    now: () => "2026-05-23T06:00:00.000Z",
+    accountId: "acct_1",
+    categoryId: "cat_coffee",
+    date: "2025-01-02",
+    description: "STARBUCKS STORE 1842",
+    amount: -6.5,
+    type: "expense",
+    rawNarration: "STARBUCKS STORE 1842",
+  });
+  const secondTransaction = createTransaction({
+    createId: () => "txn_starbucks_two",
+    now: () => "2026-05-23T06:00:00.000Z",
+    accountId: "acct_1",
+    categoryId: "cat_coffee",
+    date: "2025-02-02",
+    description: "STARBUCKS STORE 2291",
+    amount: -8.75,
+    type: "expense",
+    rawNarration: "STARBUCKS STORE 2291",
+  });
+
+  await repository.saveTransaction(firstTransaction);
+  await repository.saveTransaction(secondTransaction);
+  const similar = await repository.findSimilarTransactions("txn_starbucks_one");
+
+  assert.deepEqual(
+    similar.map((transactionRecord) => transactionRecord.id).sort(),
+    ["txn_starbucks_one", "txn_starbucks_two"]
+  );
+});
+
+test("repository applies category changes to matching past and future imports", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const firstTransaction = createTransaction({
+    createId: () => "txn_netflix_one",
+    now: () => "2026-05-23T06:00:00.000Z",
+    accountId: "acct_1",
+    categoryId: "cat_uncategorized",
+    date: "2025-01-02",
+    description: "NETFLIX.COM",
+    amount: -15.49,
+    type: "expense",
+    rawNarration: "NETFLIX.COM",
+  });
+  const secondTransaction = createTransaction({
+    createId: () => "txn_netflix_two",
+    now: () => "2026-05-23T06:00:00.000Z",
+    accountId: "acct_1",
+    categoryId: "cat_uncategorized",
+    date: "2025-02-02",
+    description: "NETFLIX.COM",
+    amount: -15.49,
+    type: "expense",
+    rawNarration: "NETFLIX.COM",
+  });
+
+  await repository.saveTransaction(firstTransaction);
+  await repository.saveTransaction(secondTransaction);
+  const result = await repository.applyTransactionCategoryChange({
+    transactionId: "txn_netflix_one",
+    categoryId: "cat_subscriptions",
+    scope: "matching_past_and_future",
   });
   const saved = await repository.loadData();
   const match = findCategoryRuleForTransaction(saved.categoryRules, {
-    rawNarration: "ELECTRONICPMT-WEB GEICO",
+    rawNarration: "NETFLIX.COM",
   });
 
+  assert.equal(result.updatedCount, 2);
+  assert.equal(result.learnedFutureRule, true);
   assert.equal(saved.categoryRules.length, 1);
-  assert.equal(saved.categoryRules[0].categoryId, "cat_bills");
-  assert.equal(saved.categoryRules[0].updatedAt, "2026-05-24T06:00:00.000Z");
-  assert.equal(match.categoryId, "cat_bills");
+  assert.equal(match.categoryId, "cat_subscriptions");
 });
 
 test("repository deletes saved transactions by id", async () => {

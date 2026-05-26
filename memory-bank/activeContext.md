@@ -11,6 +11,7 @@ Current shipped screen:
 - Import tab: TD Bank statement text/PDF import, parse, review, select rows, choose categories, save selected rows.
 - Ledger tab: saved transactions by month with income, spending, and left-over summary, plus inline edit/delete for saved transactions.
 - Reports tab: monthly cashflow chart, spending by category, upcoming subscriptions, and self-transfer toggle.
+- Categories tab: create, rename, color, hide, and restore categories.
 - Export actions: CSV transaction export and JSON backup export.
 
 Current important behavior:
@@ -21,24 +22,26 @@ Current important behavior:
 - Future matching imports can apply learned labels automatically.
 - Saved transactions can be edited after import.
 - Edited descriptions do not replace raw bank narration.
-- Changing a saved transaction category updates or creates the learned category rule for that transaction's raw bank narration.
+- Changing a saved transaction category surfaces three scope choices when similar transactions exist: this transaction, matching past transactions, or matching past and future transactions.
+- Future category learning from Ledger edits happens only when the user chooses the past-and-future option.
+- Similar transaction matching uses merchant first, then normalized raw bank narration with store numbers removed.
 - Saved transactions can be deleted with a two-step confirmation in the Ledger.
+- Hidden categories stay visible for old transactions but are removed from future assignment dropdowns unless already selected.
 - Transfers to other people count as spending.
 - Self-transfers are excluded from spending by default, with report toggle support.
 
-Latest pushed commit before this session's local changes:
+Latest pushed commit before this session:
 
 - `3f77ee3 feat: add finance workspace tabs`
 
-Current branch state after the last verified push:
+Latest local commits created this session:
 
-- `main` is up to date with `origin/main`.
+- `8838d00 feat: add ledger transaction edits`
+- Category management is committed at current `HEAD`.
 
-Current uncommitted local work:
+Current branch state:
 
-- Added repository update/delete behavior for saved transactions.
-- Added inline Ledger edit/delete controls.
-- Added tests for saved transaction update, delete, raw narration preservation, and learned rule updates.
+- `main` is ahead of `origin/main` with the local Ledger edit/delete and category management commits.
 
 ## 2026-05-26 03:12:02 - Verification baseline
 
@@ -55,3 +58,13 @@ Use Codex bundled Node when normal `npm` is unavailable:
 - Node path: `C:\Users\pgeor\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`
 - Direct test command used successfully: bundled Node with `--test src\finance\__tests__\*.test.mjs src\finance\imports\__tests__\*.test.mjs`
 - Direct build command used successfully: bundled Node with `.\node_modules\vite\bin\vite.js build`
+
+## 2026-05-26 18:04:00 - Category management verification baseline
+
+Most recent verified checks after category management work:
+
+- Finance tests: 33 passed.
+- Production build: passed with Vite.
+- `git diff --check`: passed.
+- Playwright MCP browser smoke test passed against the production `dist` build served locally at `http://127.0.0.1:5176/`.
+- Smoke test covered importing two Starbucks rows, creating a Dining category, editing one Starbucks transaction, choosing past-and-future smart apply, and confirming Reports showed Dining at `$15.25` with zero browser console errors.

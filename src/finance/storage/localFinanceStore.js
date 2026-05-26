@@ -4,7 +4,10 @@ import {
   createId as defaultCreateId,
   getCurrentTimestamp,
 } from "../domain.js";
-import { getCategoryRuleText } from "../categoryRules.js";
+import {
+  getCategoryRuleText,
+  normalizeCategoryRuleText,
+} from "../categoryRules.js";
 
 const FINANCE_DATA_KEY = "finance_app_data_v1";
 const DATABASE_NAME = "personal_finance_app";
@@ -139,6 +142,9 @@ export function createFinanceRepository({
     };
   };
 
+  const findCategoryIndex = (data, categoryId) =>
+    data.categories.findIndex((category) => category.id === categoryId);
+
   const rememberCategoryRule = (data, transaction) => {
     const matchText = getCategoryRuleText(transaction);
 
@@ -167,6 +173,80 @@ export function createFinanceRepository({
     );
   };
 
+  const updateCategory = async (categoryId, updates) => {
+    const data = await loadData();
+    const categoryIndex = findCategoryIndex(data, categoryId);
+
+    if (categoryIndex < 0) {
+      return {
+        status: "missing",
+        record: null,
+      };
+    }
+
+    const updatedCategory = {
+      ...data.categories[categoryIndex],
+      ...updates,
+      id: data.categories[categoryIndex].id,
+      createdAt: data.categories[categoryIndex].createdAt,
+    };
+
+    data.categories[categoryIndex] = updatedCategory;
+    await saveData(data);
+
+    return {
+      status: "updated",
+      record: updatedCategory,
+    };
+  };
+
+  const archiveCategory = async (categoryId) =>
+    updateCategory(categoryId, {
+      archivedAt: now(),
+    });
+
+  const restoreCategory = async (categoryId) =>
+    updateCategory(categoryId, {
+      archivedAt: null,
+    });
+
+  const normalizeSimilarityText = (value) =>
+    normalizeCategoryRuleText(value)
+      .replace(/\b\d+\b/g, " ")
+      .replace(/\b(STORE|LOCATION|POS|PURCHASE)\b/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+
+  const getSimilarityKey = (transaction) => {
+    const sourceText = transaction.merchant || getCategoryRuleText(transaction);
+    return normalizeSimilarityText(sourceText || "");
+  };
+
+  const findSimilarTransactionsInData = (data, transactionId) => {
+    const sourceTransaction = data.transactions.find(
+      (transaction) => transaction.id === transactionId
+    );
+
+    if (!sourceTransaction) {
+      return [];
+    }
+
+    const similarityKey = getSimilarityKey(sourceTransaction);
+
+    if (!similarityKey) {
+      return [sourceTransaction];
+    }
+
+    return data.transactions.filter(
+      (transaction) => getSimilarityKey(transaction) === similarityKey
+    );
+  };
+
+  const findSimilarTransactions = async (transactionId) => {
+    const data = await loadData();
+    return findSimilarTransactionsInData(data, transactionId);
+  };
+
   const updateTransaction = async (transactionId, updates) => {
     const data = await loadData();
     const transactionIndex = data.transactions.findIndex(
@@ -189,12 +269,66 @@ export function createFinanceRepository({
     };
 
     data.transactions[transactionIndex] = updatedTransaction;
-    rememberCategoryRule(data, updatedTransaction);
     await saveData(data);
 
     return {
       status: "updated",
       record: updatedTransaction,
+    };
+  };
+
+  const applyTransactionCategoryChange = async ({
+    transactionId,
+    categoryId,
+    scope = "single",
+  }) => {
+    const data = await loadData();
+    const sourceTransaction = data.transactions.find(
+      (transaction) => transaction.id === transactionId
+    );
+
+    if (!sourceTransaction) {
+      return {
+        status: "missing",
+        updatedCount: 0,
+        learnedFutureRule: false,
+      };
+    }
+
+    const targetTransactions =
+      scope === "single"
+        ? [sourceTransaction]
+        : findSimilarTransactionsInData(data, transactionId);
+
+    const targetIds = new Set(
+      targetTransactions.map((transaction) => transaction.id)
+    );
+
+    data.transactions = data.transactions.map((transaction) =>
+      targetIds.has(transaction.id)
+        ? {
+            ...transaction,
+            categoryId,
+            updatedAt: now(),
+          }
+        : transaction
+    );
+
+    const learnedFutureRule = scope === "matching_past_and_future";
+
+    if (learnedFutureRule) {
+      const updatedSource =
+        data.transactions.find((transaction) => transaction.id === transactionId) ||
+        sourceTransaction;
+      rememberCategoryRule(data, updatedSource);
+    }
+
+    await saveData(data);
+
+    return {
+      status: "updated",
+      updatedCount: targetIds.size,
+      learnedFutureRule,
     };
   };
 
@@ -266,12 +400,17 @@ export function createFinanceRepository({
     saveData,
     saveAccount: (account) => saveRecord("accounts", account),
     saveCategory: (category) => saveRecord("categories", category),
+    updateCategory,
+    archiveCategory,
+    restoreCategory,
     saveCategoryRule: (categoryRule) =>
       saveRecord("categoryRules", categoryRule),
     saveSubscription: (subscription) => saveRecord("subscriptions", subscription),
     saveImportBatch: (importBatch) => saveRecord("importBatches", importBatch),
     saveTransaction,
     updateTransaction,
+    findSimilarTransactions,
+    applyTransactionCategoryChange,
     deleteTransaction,
     saveReviewedImport,
   };

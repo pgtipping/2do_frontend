@@ -51,3 +51,22 @@ Verification:
 - `git diff --check`: passed.
 - Codex in-app browser smoke test: passed against the production `dist` build served at `http://127.0.0.1:5175/`.
 - Browser smoke test confirmed import to Ledger, inline edit save, delete confirmation, confirmed delete, and zero browser console errors.
+
+## 2026-05-26 18:04:00 - Category management implemented locally
+
+Implemented in the current local working tree:
+
+- Added Categories tab for creating, renaming, recoloring, hiding, and restoring categories.
+- Added repository methods for category updates, hide/restore, similar transaction matching, and scoped category changes.
+- Changed Ledger category edits so future learning only happens when the user chooses the past-and-future option.
+- Added smart apply choices from Ledger edits: this transaction, matching past transactions, or matching past and future transactions.
+- Kept hidden categories available for old transaction display while excluding them from normal future assignment lists.
+- Added tests for category management, smart apply behavior, and raw bank narration matching where store numbers differ.
+
+Verification:
+
+- Finance tests: 33 passed.
+- Vite production build: passed.
+- `git diff --check`: passed.
+- Playwright MCP browser smoke test: passed against the production `dist` build served at `http://127.0.0.1:5176/`.
+- Browser smoke test confirmed category creation, past-and-future smart apply for Starbucks, Dining report total of `$15.25`, and zero browser console errors.
