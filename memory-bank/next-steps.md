@@ -2,22 +2,22 @@
 
 ## 2026-05-26 18:04:00 - Active resumption path
 
-Recommended next step: push the local commits when approved, then add subscription create/edit/delete.
+Recommended next step: add subscription create/edit/delete.
 
 Why this is next:
 
 - Ledger edit/delete is committed locally.
 - Category management is committed locally.
-- Finance tests, production build, `git diff --check`, and Playwright browser smoke test pass.
+- Finance tests, production build, `git diff --check`, and Playwright browser smoke test passed before push.
+- Ledger edit/delete and category management are pushed to GitHub.
 - Subscription management is the next product gap after category cleanup.
 
 Build in this order:
 
-1. Push the local commits when approved.
-2. Add subscription create/edit/delete.
-3. Show real upcoming renewals in Reports from saved subscriptions.
-4. Add focused tests for subscription behavior.
-5. Re-run finance tests, production build, and browser checks.
+1. Add subscription create/edit/delete.
+2. Show real upcoming renewals in Reports from saved subscriptions.
+3. Add focused tests for subscription behavior.
+4. Re-run finance tests, production build, and browser checks.
 
 After subscription management:
 
