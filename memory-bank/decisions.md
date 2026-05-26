@@ -38,6 +38,14 @@ Future imports should check learned rules first and apply the matched category a
 
 This is not artificial intelligence. It is simple pattern memory, like recognizing a repeated line on a bank statement.
 
+## 2026-05-25 19:47:26 - Edited descriptions do not replace bank text
+
+Original imported bank narration stays unchanged.
+
+User-edited descriptions are personal labels for display and cleanup.
+
+Future category learning should match against the unchanged bank narration, then apply the user's saved category. Do not rewrite raw TD Bank text to match the user's edited description.
+
 ## 2026-05-25 18:06:50 - Workspace layout
 
 Use guided tabs for the first practical app shape:

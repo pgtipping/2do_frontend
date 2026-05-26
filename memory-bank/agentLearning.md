@@ -21,3 +21,13 @@ Working fallback:
 - For design comparisons, a temporary static HTML mockup can be created under ignored folders, but remove it before commit.
 
 Do not commit `.superpowers/` or `.playwright-mcp/`.
+
+## 2026-05-25 19:47:26 - Playwright profile conflict fallback
+
+The Playwright MCP browser can fail with a profile-in-use error:
+
+- `Browser is already in use for ... mcp-chrome-...`
+
+When this happens, do not claim browser verification passed.
+
+Record the blocker, rely only on completed tests/build checks, and rerun browser verification later with a clean Playwright browser profile.

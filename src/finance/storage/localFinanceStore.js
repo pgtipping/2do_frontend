@@ -139,6 +139,88 @@ export function createFinanceRepository({
     };
   };
 
+  const rememberCategoryRule = (data, transaction) => {
+    const matchText = getCategoryRuleText(transaction);
+
+    if (!transaction.categoryId || !matchText) {
+      return;
+    }
+
+    const existingRule = data.categoryRules.find(
+      (rule) => !rule.archivedAt && rule.matchText === matchText
+    );
+
+    if (existingRule) {
+      existingRule.categoryId = transaction.categoryId;
+      existingRule.updatedAt = now();
+      return;
+    }
+
+    data.categoryRules.push(
+      createCategoryRule({
+        createId,
+        now,
+        categoryId: transaction.categoryId,
+        sourceText: transaction.rawNarration || transaction.description,
+        matchText,
+      })
+    );
+  };
+
+  const updateTransaction = async (transactionId, updates) => {
+    const data = await loadData();
+    const transactionIndex = data.transactions.findIndex(
+      (transaction) => transaction.id === transactionId
+    );
+
+    if (transactionIndex < 0) {
+      return {
+        status: "missing",
+        record: null,
+      };
+    }
+
+    const updatedTransaction = {
+      ...data.transactions[transactionIndex],
+      ...updates,
+      rawNarration: data.transactions[transactionIndex].rawNarration,
+      id: data.transactions[transactionIndex].id,
+      updatedAt: now(),
+    };
+
+    data.transactions[transactionIndex] = updatedTransaction;
+    rememberCategoryRule(data, updatedTransaction);
+    await saveData(data);
+
+    return {
+      status: "updated",
+      record: updatedTransaction,
+    };
+  };
+
+  const deleteTransaction = async (transactionId) => {
+    const data = await loadData();
+    const originalLength = data.transactions.length;
+
+    data.transactions = data.transactions.filter(
+      (transaction) => transaction.id !== transactionId
+    );
+
+    if (data.transactions.length === originalLength) {
+      return {
+        status: "missing",
+        record: null,
+      };
+    }
+
+    await saveData(data);
+
+    return {
+      status: "deleted",
+      record: null,
+    };
+  };
+
   const saveReviewedImport = async ({ importBatch, rows }) => {
     const data = await loadData();
     let createdTransactionCount = 0;
@@ -161,28 +243,7 @@ export function createFinanceRepository({
       data.transactions.push(transaction);
       createdTransactionCount += 1;
 
-      const matchText = getCategoryRuleText(transaction);
-      const hasRule =
-        transaction.categoryId &&
-        matchText &&
-        data.categoryRules.some(
-          (rule) =>
-            !rule.archivedAt &&
-            rule.categoryId === transaction.categoryId &&
-            rule.matchText === matchText
-        );
-
-      if (transaction.categoryId && matchText && !hasRule) {
-        data.categoryRules.push(
-          createCategoryRule({
-            createId,
-            now,
-            categoryId: transaction.categoryId,
-            sourceText: transaction.rawNarration || transaction.description,
-            matchText,
-          })
-        );
-      }
+      rememberCategoryRule(data, transaction);
     });
 
     const savedImportBatch = {
@@ -210,6 +271,8 @@ export function createFinanceRepository({
     saveSubscription: (subscription) => saveRecord("subscriptions", subscription),
     saveImportBatch: (importBatch) => saveRecord("importBatches", importBatch),
     saveTransaction,
+    updateTransaction,
+    deleteTransaction,
     saveReviewedImport,
   };
 }

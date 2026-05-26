@@ -3,9 +3,11 @@ import {
   FaChartPie,
   FaCheck,
   FaDownload,
+  FaEdit,
   FaExclamationTriangle,
   FaFileImport,
   FaListUl,
+  FaTrash,
 } from "react-icons/fa";
 import { createDefaultCategories } from "../defaultCategories";
 import { createFinanceRepository } from "../storage/localFinanceStore";
@@ -93,6 +95,9 @@ export default function FinanceImportScreen() {
   const [financeData, setFinanceData] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState("2025-01");
   const [includeSelfTransfers, setIncludeSelfTransfers] = useState(false);
+  const [editingTransactionId, setEditingTransactionId] = useState(null);
+  const [transactionForm, setTransactionForm] = useState(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const defaultCategories = useMemo(() => createDefaultCategories(), []);
   const repository = useMemo(() => createFinanceRepository(), []);
   const categories =
@@ -216,6 +221,59 @@ export default function FinanceImportScreen() {
     setSaveResult(result);
     await loadFinanceData();
     setActiveTab("ledger");
+  };
+
+  const startEditingTransaction = (transaction) => {
+    setEditingTransactionId(transaction.id);
+    setConfirmingDeleteId(null);
+    setTransactionForm({
+      categoryId: transaction.categoryId || "",
+      description: transaction.description || "",
+      merchant: transaction.merchant || "",
+      notes: transaction.notes || "",
+      type: transaction.type,
+    });
+  };
+
+  const cancelEditingTransaction = () => {
+    setEditingTransactionId(null);
+    setTransactionForm(null);
+  };
+
+  const updateTransactionForm = (fieldName, value) => {
+    setTransactionForm((currentForm) => ({
+      ...currentForm,
+      [fieldName]: value,
+    }));
+  };
+
+  const saveTransactionEdit = async (transactionId) => {
+    if (!transactionForm) {
+      return;
+    }
+
+    await repository.updateTransaction(transactionId, {
+      categoryId: transactionForm.categoryId || null,
+      description: transactionForm.description.trim(),
+      merchant: transactionForm.merchant.trim() || null,
+      notes: transactionForm.notes.trim(),
+      type: transactionForm.type,
+    });
+    cancelEditingTransaction();
+    await loadFinanceData();
+  };
+
+  const deleteTransaction = async (transactionId) => {
+    if (confirmingDeleteId !== transactionId) {
+      setConfirmingDeleteId(transactionId);
+      setEditingTransactionId(null);
+      setTransactionForm(null);
+      return;
+    }
+
+    await repository.deleteTransaction(transactionId);
+    setConfirmingDeleteId(null);
+    await loadFinanceData();
   };
 
   const exportBackup = () => {
@@ -505,20 +563,144 @@ export default function FinanceImportScreen() {
 
           {monthTransactions.length > 0 ? (
             <div className="transaction-table">
-              {monthTransactions.map((transaction) => (
-                <article className="transaction-row" key={transaction.id}>
-                  <div>
-                    <strong>{transaction.description}</strong>
-                    <span>{transaction.date}</span>
-                  </div>
-                  <div>{formatType(transaction.type)}</div>
-                  <div>
-                    {categoryById.get(transaction.categoryId)?.name ||
-                      "Uncategorized"}
-                  </div>
-                  <div>{formatMoney(transaction.amount)}</div>
-                </article>
-              ))}
+              {monthTransactions.map((transaction) => {
+                const isEditing = editingTransactionId === transaction.id;
+                const isConfirmingDelete = confirmingDeleteId === transaction.id;
+
+                return (
+                  <article
+                    className={`transaction-row ${isEditing ? "editing" : ""}`}
+                    key={transaction.id}
+                  >
+                    {isEditing ? (
+                      <>
+                        <div className="transaction-edit-grid">
+                          <label>
+                            Description
+                            <input
+                              value={transactionForm.description}
+                              onChange={(event) =>
+                                updateTransactionForm("description", event.target.value)
+                              }
+                            />
+                          </label>
+                          <label>
+                            Merchant
+                            <input
+                              value={transactionForm.merchant}
+                              onChange={(event) =>
+                                updateTransactionForm("merchant", event.target.value)
+                              }
+                            />
+                          </label>
+                          <label>
+                            Type
+                            <select
+                              value={transactionForm.type}
+                              onChange={(event) =>
+                                updateTransactionForm("type", event.target.value)
+                              }
+                            >
+                              <option value="income">Income</option>
+                              <option value="expense">Expense</option>
+                              <option value="transfer_to_other">
+                                Transfer to other
+                              </option>
+                              <option value="transfer_to_self">
+                                Transfer to self
+                              </option>
+                            </select>
+                          </label>
+                          <label>
+                            Category
+                            <select
+                              value={transactionForm.categoryId}
+                              onChange={(event) =>
+                                updateTransactionForm("categoryId", event.target.value)
+                              }
+                            >
+                              <option value="">Uncategorized</option>
+                              {categories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {category.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="transaction-notes-field">
+                            Notes
+                            <textarea
+                              value={transactionForm.notes}
+                              onChange={(event) =>
+                                updateTransactionForm("notes", event.target.value)
+                              }
+                            />
+                          </label>
+                        </div>
+                        <div className="transaction-actions">
+                          <button
+                            className="primary-action compact"
+                            type="button"
+                            onClick={() => saveTransactionEdit(transaction.id)}
+                          >
+                            <FaCheck aria-hidden="true" />
+                            Save
+                          </button>
+                          <button
+                            className="ghost-action compact"
+                            type="button"
+                            onClick={cancelEditingTransaction}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <strong>{transaction.description}</strong>
+                          <span>{transaction.date}</span>
+                        </div>
+                        <div>{formatType(transaction.type)}</div>
+                        <div>
+                          {categoryById.get(transaction.categoryId)?.name ||
+                            "Uncategorized"}
+                        </div>
+                        <div>{formatMoney(transaction.amount)}</div>
+                        <div className="transaction-actions">
+                          <button
+                            className="icon-action"
+                            type="button"
+                            aria-label={`Edit ${transaction.description}`}
+                            onClick={() => startEditingTransaction(transaction)}
+                          >
+                            <FaEdit aria-hidden="true" />
+                          </button>
+                          <button
+                            className={`icon-action danger ${
+                              isConfirmingDelete ? "confirming" : ""
+                            }`}
+                            type="button"
+                            aria-label={
+                              isConfirmingDelete
+                                ? `Confirm delete ${transaction.description}`
+                                : `Delete ${transaction.description}`
+                            }
+                            onClick={() => deleteTransaction(transaction.id)}
+                          >
+                            <FaTrash aria-hidden="true" />
+                          </button>
+                        </div>
+                        {isConfirmingDelete ? (
+                          <p className="delete-confirmation">
+                            Select delete again to remove this transaction.
+                          </p>
+                        ) : null}
+                      </>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="empty-review">

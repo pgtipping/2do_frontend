@@ -32,3 +32,22 @@ Verification for that commit:
 - Vite production build passed.
 - Browser checks passed on desktop and mobile.
 - Commit was pushed to `origin/main`.
+
+## 2026-05-25 19:47:26 - Ledger edit and delete implemented locally
+
+Implemented in the current local working tree:
+
+- Added repository methods to update and delete saved transactions.
+- Preserved raw imported bank narration when a user edits the display description.
+- Added category-rule learning for saved transaction edits.
+- Added Ledger inline edit controls for category, transaction type, notes, merchant, and description.
+- Added two-step delete confirmation in the Ledger.
+- Added tests for update, delete, raw narration preservation, and learned category-rule updates.
+
+Verification:
+
+- Finance tests: 29 passed.
+- Vite production build: passed.
+- `git diff --check`: passed.
+- Codex in-app browser smoke test: passed against the production `dist` build served at `http://127.0.0.1:5175/`.
+- Browser smoke test confirmed import to Ledger, inline edit save, delete confirmation, confirmed delete, and zero browser console errors.

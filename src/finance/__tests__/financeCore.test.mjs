@@ -249,6 +249,121 @@ test("repository remembers reviewed transaction labels as future import rules", 
   assert.equal(match.categoryId, "cat_insurance");
 });
 
+test("repository updates saved transactions while preserving raw bank narration", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const transaction = createTransaction({
+    createId: () => "txn_rent",
+    now: () => "2026-05-23T06:00:00.000Z",
+    accountId: "acct_1",
+    categoryId: "cat_uncategorized",
+    date: "2025-01-02",
+    description: "TD ZELLESENT JOHN DOE RENT PAYMENT",
+    amount: -800,
+    type: "transfer_to_other",
+    source: "td_bank_pdf",
+    rawNarration: "TD ZELLESENT JOHN DOE RENT PAYMENT",
+    importFingerprint: "td-rent-2025-01-02-800",
+  });
+
+  await repository.saveTransaction(transaction);
+  const result = await repository.updateTransaction("txn_rent", {
+    categoryId: "cat_rent",
+    description: "Rent to John",
+    merchant: "John Doe",
+    notes: "January rent",
+    type: "expense",
+  });
+  const saved = await repository.loadData();
+
+  assert.equal(result.status, "updated");
+  assert.equal(saved.transactions[0].description, "Rent to John");
+  assert.equal(saved.transactions[0].rawNarration, "TD ZELLESENT JOHN DOE RENT PAYMENT");
+  assert.equal(saved.transactions[0].categoryId, "cat_rent");
+  assert.equal(saved.transactions[0].merchant, "John Doe");
+  assert.equal(saved.transactions[0].notes, "January rent");
+  assert.equal(saved.transactions[0].type, "expense");
+  assert.equal(saved.transactions[0].updatedAt, "2026-05-24T06:00:00.000Z");
+});
+
+test("repository updates learned category rule when edited category changes", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const transaction = createTransaction({
+    createId: () => "txn_geico",
+    now: () => "2026-05-23T06:00:00.000Z",
+    accountId: "acct_1",
+    categoryId: "cat_uncategorized",
+    date: "2025-01-02",
+    description: "ELECTRONICPMT-WEB GEICO",
+    amount: -128.44,
+    type: "expense",
+    source: "td_bank_pdf",
+    rawNarration: "ELECTRONICPMT-WEB GEICO",
+    importFingerprint: "td-geico-2025-01-02-128.44",
+  });
+
+  await repository.saveTransaction(transaction);
+  await repository.updateTransaction("txn_geico", {
+    categoryId: "cat_insurance",
+  });
+  await repository.updateTransaction("txn_geico", {
+    categoryId: "cat_bills",
+  });
+  const saved = await repository.loadData();
+  const match = findCategoryRuleForTransaction(saved.categoryRules, {
+    rawNarration: "ELECTRONICPMT-WEB GEICO",
+  });
+
+  assert.equal(saved.categoryRules.length, 1);
+  assert.equal(saved.categoryRules[0].categoryId, "cat_bills");
+  assert.equal(saved.categoryRules[0].updatedAt, "2026-05-24T06:00:00.000Z");
+  assert.equal(match.categoryId, "cat_bills");
+});
+
+test("repository deletes saved transactions by id", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const firstTransaction = createTransaction({
+    createId: () => "txn_keep",
+    now: repository.now,
+    accountId: "acct_1",
+    date: "2025-01-02",
+    description: "MOBILE DEPOSIT",
+    amount: 500,
+    type: "income",
+  });
+  const secondTransaction = createTransaction({
+    createId: () => "txn_delete",
+    now: repository.now,
+    accountId: "acct_1",
+    date: "2025-01-03",
+    description: "WALMART STORE",
+    amount: -42.91,
+    type: "expense",
+  });
+
+  await repository.saveTransaction(firstTransaction);
+  await repository.saveTransaction(secondTransaction);
+  const result = await repository.deleteTransaction("txn_delete");
+  const saved = await repository.loadData();
+
+  assert.equal(result.status, "deleted");
+  assert.deepEqual(
+    saved.transactions.map((transactionRecord) => transactionRecord.id),
+    ["txn_keep"]
+  );
+});
+
 test("monthly summary counts transfers to others as spend and hides self-transfers by default", () => {
   const transactions = [
     createTransaction({
