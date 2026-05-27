@@ -69,3 +69,21 @@ Most recent verified checks after category management work:
 - `git diff --check`: passed.
 - Playwright MCP browser smoke test passed against the production `dist` build served locally at `http://127.0.0.1:5176/`.
 - Smoke test covered importing two Starbucks rows, creating a Dining category, editing one Starbucks transaction, choosing past-and-future smart apply, and confirming Reports showed Dining at `$15.25` with zero browser console errors.
+
+## 2026-05-26 19:05:00 - Subscription management verification baseline
+
+Current working tree now includes subscription management and real upcoming renewal display:
+
+- Added Subscriptions tab for creating, editing, and deleting saved subscriptions.
+- Saved subscription fields include name, amount, category, cadence, next renewal date, reminder lead time, status, and notes.
+- Added repository methods to update and delete subscriptions.
+- Reports now displays upcoming renewals from saved subscriptions, including amount, cadence, category, and renewal date.
+- Reports falls back safely for older subscription records that may not have cadence, category, or notes.
+
+Verification:
+
+- Finance tests: 35 passed.
+- Production build: passed with Vite.
+- `git diff --check`: passed.
+- Playwright MCP browser smoke test passed against the production `dist` build served from a persistent Node REPL static server at `http://127.0.0.1:5178/`.
+- Browser smoke test covered subscription create, Reports renewal display, subscription edit, Reports update, two-click subscription delete, Reports empty state, and zero browser console warnings/errors.

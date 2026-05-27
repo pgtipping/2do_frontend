@@ -70,3 +70,22 @@ Verification:
 - `git diff --check`: passed.
 - Playwright MCP browser smoke test: passed against the production `dist` build served at `http://127.0.0.1:5176/`.
 - Browser smoke test confirmed category creation, past-and-future smart apply for Starbucks, Dining report total of `$15.25`, and zero browser console errors.
+
+## 2026-05-26 19:05:00 - Subscription management implemented locally
+
+Implemented in the current local working tree:
+
+- Added Subscriptions tab for creating saved subscription renewals.
+- Added inline subscription editing for amount, cadence, category, next renewal date, reminder lead time, status, and notes.
+- Added two-click subscription delete confirmation.
+- Added repository update/delete methods for subscriptions.
+- Updated upcoming renewal reports to use real saved subscriptions and show amount, cadence, category, and renewal date.
+- Added tests for subscription create/edit/delete and report renewal details.
+
+Verification:
+
+- Finance tests: 35 passed.
+- Vite production build: passed.
+- `git diff --check`: passed.
+- Playwright MCP browser smoke test: passed against the production `dist` build served at `http://127.0.0.1:5178/`.
+- Browser smoke test confirmed create, report display, edit, report update, delete, report empty state, and zero browser console warnings/errors.

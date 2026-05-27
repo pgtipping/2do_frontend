@@ -100,9 +100,47 @@ test("upcoming subscriptions are sorted by renewal date and reminder window", ()
       id: "sub_due",
       name: "Music",
       amount: 12.99,
+      cadence: "monthly",
+      categoryId: null,
       nextRenewalDate: "2025-02-10",
       daysUntilRenewal: 6,
       isInReminderWindow: true,
+      notes: "",
+    },
+  ]);
+});
+
+test("upcoming subscriptions keep saved amount, cadence, category, and notes for reports", () => {
+  const subscriptions = [
+    {
+      id: "sub_insurance",
+      name: "Insurance",
+      categoryId: "cat_insurance",
+      amount: 128.44,
+      cadence: "monthly",
+      nextRenewalDate: "2026-06-01",
+      reminderDaysBefore: 10,
+      status: "active",
+      notes: "Auto draft",
+    },
+  ];
+
+  const upcoming = getUpcomingSubscriptions(subscriptions, {
+    today: "2026-05-26",
+    daysAhead: 30,
+  });
+
+  assert.deepEqual(upcoming, [
+    {
+      id: "sub_insurance",
+      name: "Insurance",
+      amount: 128.44,
+      cadence: "monthly",
+      categoryId: "cat_insurance",
+      nextRenewalDate: "2026-06-01",
+      daysUntilRenewal: 6,
+      isInReminderWindow: true,
+      notes: "Auto draft",
     },
   ]);
 });

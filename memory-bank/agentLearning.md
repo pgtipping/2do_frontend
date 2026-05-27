@@ -42,3 +42,14 @@ Working pattern:
 - Start `python -m http.server` with `Start-Process` using escalation when the server must stay alive across Playwright MCP calls.
 - Stop that temporary process after the browser check.
 - Use Playwright MCP against `http://127.0.0.1:<port>/` and record the checked user flow plus console error result.
+
+## 2026-05-26 19:05:00 - Persistent Node REPL smoke server fallback
+
+When shell-started servers disappear before Playwright MCP can connect, start a small static server from the Node REPL tool instead.
+
+Working pattern:
+
+- Build `dist` first with bundled Node.
+- Use Node REPL to create an HTTP server for `dist` and keep it on `globalThis`.
+- Point Playwright MCP at that local port.
+- This worked for the subscription browser smoke test at `http://127.0.0.1:5178/` without escalation.

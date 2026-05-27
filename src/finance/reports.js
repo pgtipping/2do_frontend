@@ -92,11 +92,14 @@ export function getUpcomingSubscriptions(
     .map((subscription) => ({
       id: subscription.id,
       name: subscription.name,
+      categoryId: subscription.categoryId || null,
       amount: subscription.amount,
+      cadence: subscription.cadence || "monthly",
       nextRenewalDate: subscription.nextRenewalDate,
       daysUntilRenewal: subscription.daysUntilRenewal,
       isInReminderWindow:
         subscription.daysUntilRenewal <= subscription.reminderDaysBefore,
+      notes: subscription.notes || "",
     }))
     .sort((first, second) =>
       first.nextRenewalDate.localeCompare(second.nextRenewalDate)

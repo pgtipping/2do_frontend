@@ -355,6 +355,59 @@ export function createFinanceRepository({
     };
   };
 
+  const updateSubscription = async (subscriptionId, updates) => {
+    const data = await loadData();
+    const subscriptionIndex = data.subscriptions.findIndex(
+      (subscription) => subscription.id === subscriptionId
+    );
+
+    if (subscriptionIndex < 0) {
+      return {
+        status: "missing",
+        record: null,
+      };
+    }
+
+    const updatedSubscription = {
+      ...data.subscriptions[subscriptionIndex],
+      ...updates,
+      id: data.subscriptions[subscriptionIndex].id,
+      createdAt: data.subscriptions[subscriptionIndex].createdAt,
+      updatedAt: now(),
+    };
+
+    data.subscriptions[subscriptionIndex] = updatedSubscription;
+    await saveData(data);
+
+    return {
+      status: "updated",
+      record: updatedSubscription,
+    };
+  };
+
+  const deleteSubscription = async (subscriptionId) => {
+    const data = await loadData();
+    const originalLength = data.subscriptions.length;
+
+    data.subscriptions = data.subscriptions.filter(
+      (subscription) => subscription.id !== subscriptionId
+    );
+
+    if (data.subscriptions.length === originalLength) {
+      return {
+        status: "missing",
+        record: null,
+      };
+    }
+
+    await saveData(data);
+
+    return {
+      status: "deleted",
+      record: null,
+    };
+  };
+
   const saveReviewedImport = async ({ importBatch, rows }) => {
     const data = await loadData();
     let createdTransactionCount = 0;
@@ -406,6 +459,8 @@ export function createFinanceRepository({
     saveCategoryRule: (categoryRule) =>
       saveRecord("categoryRules", categoryRule),
     saveSubscription: (subscription) => saveRecord("subscriptions", subscription),
+    updateSubscription,
+    deleteSubscription,
     saveImportBatch: (importBatch) => saveRecord("importBatches", importBatch),
     saveTransaction,
     updateTransaction,

@@ -69,7 +69,7 @@
   border-radius: 8px;
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0 auto 18px;
   max-width: 1360px;
   padding: 6px;
@@ -440,7 +440,8 @@
 
 .ledger-workspace,
 .reports-workspace,
-.categories-workspace {
+.categories-workspace,
+.subscriptions-workspace {
   margin: 0 auto;
   max-width: 1360px;
 }
@@ -657,14 +658,17 @@
   grid-column: 1 / -1;
 }
 
-.category-layout {
+.category-layout,
+.subscriptions-layout {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(320px, 0.75fr) minmax(520px, 1.25fr);
 }
 
 .category-editor-panel,
-.category-list-panel {
+.category-list-panel,
+.subscription-editor-panel,
+.subscription-list-panel {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(190, 204, 194, 0.8);
   border-radius: 8px;
@@ -676,7 +680,8 @@
   grid-column: 2;
 }
 
-.category-form-grid {
+.category-form-grid,
+.subscription-form-grid {
   display: grid;
   gap: 12px;
 }
@@ -686,7 +691,17 @@
   width: 100%;
 }
 
-.category-form-grid label {
+.subscription-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.subscription-form-grid.inline {
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  width: 100%;
+}
+
+.category-form-grid label,
+.subscription-form-grid label {
   color: #53645a;
   display: grid;
   font-size: 12px;
@@ -696,7 +711,10 @@
 }
 
 .category-form-grid input,
-.category-form-grid select {
+.category-form-grid select,
+.subscription-form-grid input,
+.subscription-form-grid select,
+.subscription-form-grid textarea {
   background: #f8faf6;
   border: 1px solid #d6e0d8;
   border-radius: 6px;
@@ -710,23 +728,38 @@
   width: 100%;
 }
 
+.subscription-form-grid textarea {
+  min-height: 74px;
+  padding: 10px;
+  resize: vertical;
+}
+
 .category-form-grid input[type="color"] {
   padding: 4px;
 }
 
 .category-form-grid input:focus,
-.category-form-grid select:focus {
+.category-form-grid select:focus,
+.subscription-form-grid input:focus,
+.subscription-form-grid select:focus,
+.subscription-form-grid textarea:focus {
   border-color: #406f59;
   box-shadow: 0 0 0 3px rgba(64, 111, 89, 0.12);
 }
 
-.category-list {
+.subscription-notes-field {
+  grid-column: 1 / -1;
+}
+
+.category-list,
+.subscription-list {
   border: 1px solid #e4ebe5;
   border-radius: 8px;
   overflow: hidden;
 }
 
-.category-row {
+.category-row,
+.subscription-row {
   align-items: center;
   border-bottom: 1px solid #e4ebe5;
   display: grid;
@@ -736,7 +769,16 @@
   padding: 12px;
 }
 
+.subscription-row {
+  grid-template-columns:
+    minmax(180px, 1fr) 110px 110px 130px 100px 92px;
+}
+
 .category-row:last-child {
+  border-bottom: 0;
+}
+
+.subscription-row:last-child {
   border-bottom: 0;
 }
 
@@ -744,14 +786,26 @@
   background: #f8faf6;
 }
 
-.category-row strong {
+.category-row strong,
+.subscription-row strong {
   color: #18241d;
   display: block;
 }
 
-.category-row span {
+.category-row span,
+.subscription-row span {
   color: #617268;
   font-size: 13px;
+}
+
+.subscription-row > div:nth-child(2) {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.subscription-row > div:nth-child(3),
+.subscription-row > div:nth-child(5) {
+  text-transform: capitalize;
 }
 
 .category-color {
@@ -864,6 +918,13 @@
 
 .report-list-row span {
   color: #304239;
+  display: grid;
+  gap: 3px;
+}
+
+.report-list-row small {
+  color: #617268;
+  font-size: 12px;
 }
 
 .report-list-row strong {
@@ -885,6 +946,7 @@
 
   .import-workspace,
   .category-layout,
+  .subscriptions-layout,
   .report-grid,
   .summary-strip {
     grid-template-columns: 1fr;
@@ -915,7 +977,10 @@
   .transaction-row.editing,
   .transaction-edit-grid,
   .category-form-grid.inline,
-  .category-row {
+  .subscription-form-grid,
+  .subscription-form-grid.inline,
+  .category-row,
+  .subscription-row {
     grid-template-columns: 1fr;
   }
 

@@ -6,6 +6,7 @@ import {
   createCategoryRule,
   createCategory,
   createDefaultFinanceData,
+  createSubscription,
   createTransaction,
 } from "../domain.js";
 import { calculateMonthlySummary } from "../reports.js";
@@ -547,6 +548,43 @@ test("repository deletes saved transactions by id", async () => {
     saved.transactions.map((transactionRecord) => transactionRecord.id),
     ["txn_keep"]
   );
+});
+
+test("repository creates, updates, and deletes saved subscriptions", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+  const subscription = createSubscription({
+    createId: () => "sub_music",
+    now: () => "2026-05-23T06:00:00.000Z",
+    name: "Music",
+    categoryId: "cat_entertainment",
+    amount: 12.99,
+    cadence: "monthly",
+    nextRenewalDate: "2026-06-02",
+    reminderDaysBefore: 7,
+    status: "active",
+    notes: "Family plan",
+  });
+
+  const createResult = await repository.saveSubscription(subscription);
+  const updateResult = await repository.updateSubscription("sub_music", {
+    amount: 14.99,
+    nextRenewalDate: "2026-07-02",
+    notes: "Price increase",
+  });
+  const deleteResult = await repository.deleteSubscription("sub_music");
+  const saved = await repository.loadData();
+
+  assert.equal(createResult.status, "created");
+  assert.equal(updateResult.status, "updated");
+  assert.equal(updateResult.record.amount, 14.99);
+  assert.equal(updateResult.record.notes, "Price increase");
+  assert.equal(updateResult.record.updatedAt, "2026-05-24T06:00:00.000Z");
+  assert.equal(deleteResult.status, "deleted");
+  assert.deepEqual(saved.subscriptions, []);
 });
 
 test("monthly summary counts transfers to others as spend and hides self-transfers by default", () => {

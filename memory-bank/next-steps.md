@@ -1,25 +1,17 @@
 # Next Steps
 
-## 2026-05-26 18:04:00 - Active resumption path
+## 2026-05-26 19:05:00 - Active resumption path
 
-Recommended next step: add subscription create/edit/delete.
+Recommended next step: add JSON restore import, not only JSON export.
 
 Why this is next:
 
-- Ledger edit/delete is committed locally.
-- Category management is committed locally.
-- Finance tests, production build, `git diff --check`, and Playwright browser smoke test passed before push.
-- Ledger edit/delete and category management are pushed to GitHub.
-- Subscription management is the next product gap after category cleanup.
+- Subscription create/edit/delete is implemented locally.
+- Reports now shows real upcoming renewals from saved subscriptions.
+- Finance tests, production build, `git diff --check`, and Playwright browser smoke test passed for the subscription work.
+- JSON backup export exists, but restore import is still not exposed in the app UI.
 
 Build in this order:
-
-1. Add subscription create/edit/delete.
-2. Show real upcoming renewals in Reports from saved subscriptions.
-3. Add focused tests for subscription behavior.
-4. Re-run finance tests, production build, and browser checks.
-
-After subscription management:
 
 1. Add JSON restore import, not only JSON export.
 2. Improve README with current MVP behavior and screenshots.

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  FaCalendarAlt,
   FaChartPie,
   FaCheck,
   FaDownload,
@@ -11,7 +12,7 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import { createDefaultCategories } from "../defaultCategories";
-import { createCategory } from "../domain";
+import { createCategory, createSubscription } from "../domain";
 import { createFinanceRepository } from "../storage/localFinanceStore";
 import { extractTextFromPdfFile } from "../imports/pdfTextExtractor";
 import { parseTdBankStatementText } from "../imports/tdBankStatementParser";
@@ -52,6 +53,17 @@ const DEFAULT_CATEGORY_FORM = {
   color: "#406f59",
   name: "",
   type: "expense",
+};
+
+const DEFAULT_SUBSCRIPTION_FORM = {
+  amount: "",
+  cadence: "monthly",
+  categoryId: "",
+  name: "",
+  nextRenewalDate: "",
+  notes: "",
+  reminderDaysBefore: "7",
+  status: "active",
 };
 
 function createStableId(prefix) {
@@ -110,6 +122,13 @@ export default function FinanceImportScreen() {
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [categoryForm, setCategoryForm] = useState(DEFAULT_CATEGORY_FORM);
   const [pendingCategoryApply, setPendingCategoryApply] = useState(null);
+  const [subscriptionForm, setSubscriptionForm] = useState(DEFAULT_SUBSCRIPTION_FORM);
+  const [editingSubscriptionId, setEditingSubscriptionId] = useState(null);
+  const [editingSubscriptionForm, setEditingSubscriptionForm] = useState(
+    DEFAULT_SUBSCRIPTION_FORM
+  );
+  const [confirmingSubscriptionDeleteId, setConfirmingSubscriptionDeleteId] =
+    useState(null);
   const defaultCategories = useMemo(() => createDefaultCategories(), []);
   const repository = useMemo(() => createFinanceRepository(), []);
   const categories =
@@ -410,6 +429,100 @@ export default function FinanceImportScreen() {
     await loadFinanceData();
   };
 
+  const updateSubscriptionForm = (fieldName, value) => {
+    setSubscriptionForm((currentForm) => ({
+      ...currentForm,
+      [fieldName]: value,
+    }));
+  };
+
+  const updateEditingSubscriptionForm = (fieldName, value) => {
+    setEditingSubscriptionForm((currentForm) => ({
+      ...currentForm,
+      [fieldName]: value,
+    }));
+  };
+
+  const buildSubscriptionUpdates = (form) => ({
+    amount: Number(form.amount),
+    cadence: form.cadence,
+    categoryId: form.categoryId || null,
+    name: form.name.trim(),
+    nextRenewalDate: form.nextRenewalDate,
+    notes: form.notes.trim(),
+    reminderDaysBefore: Number(form.reminderDaysBefore),
+    status: form.status,
+  });
+
+  const isSubscriptionFormValid = (form) =>
+    form.name.trim() &&
+    form.nextRenewalDate &&
+    Number.isFinite(Number(form.amount)) &&
+    Number(form.amount) > 0 &&
+    Number.isFinite(Number(form.reminderDaysBefore)) &&
+    Number(form.reminderDaysBefore) >= 0;
+
+  const createCustomSubscription = async () => {
+    if (!isSubscriptionFormValid(subscriptionForm)) {
+      return;
+    }
+
+    await repository.saveSubscription(
+      createSubscription({
+        createId: repository.createId,
+        now: repository.now,
+        ...buildSubscriptionUpdates(subscriptionForm),
+      })
+    );
+    setSubscriptionForm(DEFAULT_SUBSCRIPTION_FORM);
+    await loadFinanceData();
+  };
+
+  const startEditingSubscription = (subscription) => {
+    setEditingSubscriptionId(subscription.id);
+    setConfirmingSubscriptionDeleteId(null);
+    setEditingSubscriptionForm({
+      amount: String(subscription.amount),
+      cadence: subscription.cadence || "monthly",
+      categoryId: subscription.categoryId || "",
+      name: subscription.name || "",
+      nextRenewalDate: subscription.nextRenewalDate || "",
+      notes: subscription.notes || "",
+      reminderDaysBefore: String(subscription.reminderDaysBefore ?? 7),
+      status: subscription.status || "active",
+    });
+  };
+
+  const cancelEditingSubscription = () => {
+    setEditingSubscriptionId(null);
+    setEditingSubscriptionForm(DEFAULT_SUBSCRIPTION_FORM);
+  };
+
+  const saveSubscriptionEdit = async (subscriptionId) => {
+    if (!isSubscriptionFormValid(editingSubscriptionForm)) {
+      return;
+    }
+
+    await repository.updateSubscription(
+      subscriptionId,
+      buildSubscriptionUpdates(editingSubscriptionForm)
+    );
+    cancelEditingSubscription();
+    await loadFinanceData();
+  };
+
+  const deleteSubscription = async (subscriptionId) => {
+    if (confirmingSubscriptionDeleteId !== subscriptionId) {
+      setConfirmingSubscriptionDeleteId(subscriptionId);
+      setEditingSubscriptionId(null);
+      return;
+    }
+
+    await repository.deleteSubscription(subscriptionId);
+    setConfirmingSubscriptionDeleteId(null);
+    await loadFinanceData();
+  };
+
   const exportBackup = () => {
     if (!financeData) {
       return;
@@ -466,6 +579,9 @@ export default function FinanceImportScreen() {
     categories.filter(
       (category) => !category.archivedAt || category.id === selectedCategoryId
     );
+  const sortedSubscriptions = [...subscriptions].sort((first, second) =>
+    first.nextRenewalDate.localeCompare(second.nextRenewalDate)
+  );
 
   return (
     <main className="finance-shell">
@@ -510,6 +626,14 @@ export default function FinanceImportScreen() {
         >
           <FaChartPie aria-hidden="true" />
           Reports
+        </button>
+        <button
+          className={activeTab === "subscriptions" ? "active" : ""}
+          type="button"
+          onClick={() => setActiveTab("subscriptions")}
+        >
+          <FaCalendarAlt aria-hidden="true" />
+          Subscriptions
         </button>
         <button
           className={activeTab === "categories" ? "active" : ""}
@@ -1090,6 +1214,341 @@ export default function FinanceImportScreen() {
         </section>
       ) : null}
 
+      {activeTab === "subscriptions" ? (
+        <section className="subscriptions-workspace">
+          <div className="subscriptions-layout">
+            <section className="subscription-editor-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Subscriptions</p>
+                  <h2>Create renewal</h2>
+                </div>
+              </div>
+              <div className="subscription-form-grid">
+                <label>
+                  Name
+                  <input
+                    value={subscriptionForm.name}
+                    onChange={(event) =>
+                      updateSubscriptionForm("name", event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Amount
+                  <input
+                    min="0"
+                    step="0.01"
+                    type="number"
+                    value={subscriptionForm.amount}
+                    onChange={(event) =>
+                      updateSubscriptionForm("amount", event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Next renewal
+                  <input
+                    type="date"
+                    value={subscriptionForm.nextRenewalDate}
+                    onChange={(event) =>
+                      updateSubscriptionForm("nextRenewalDate", event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Category
+                  <select
+                    value={subscriptionForm.categoryId}
+                    onChange={(event) =>
+                      updateSubscriptionForm("categoryId", event.target.value)
+                    }
+                  >
+                    <option value="">Uncategorized</option>
+                    {visibleCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Cadence
+                  <select
+                    value={subscriptionForm.cadence}
+                    onChange={(event) =>
+                      updateSubscriptionForm("cadence", event.target.value)
+                    }
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </label>
+                <label>
+                  Remind days before
+                  <input
+                    min="0"
+                    step="1"
+                    type="number"
+                    value={subscriptionForm.reminderDaysBefore}
+                    onChange={(event) =>
+                      updateSubscriptionForm(
+                        "reminderDaysBefore",
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Status
+                  <select
+                    value={subscriptionForm.status}
+                    onChange={(event) =>
+                      updateSubscriptionForm("status", event.target.value)
+                    }
+                  >
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+                <label className="subscription-notes-field">
+                  Notes
+                  <textarea
+                    value={subscriptionForm.notes}
+                    onChange={(event) =>
+                      updateSubscriptionForm("notes", event.target.value)
+                    }
+                  />
+                </label>
+                <button
+                  className="primary-action"
+                  type="button"
+                  onClick={createCustomSubscription}
+                  disabled={!isSubscriptionFormValid(subscriptionForm)}
+                >
+                  Add subscription
+                </button>
+              </div>
+            </section>
+
+            <section className="subscription-list-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Renewals</p>
+                  <h2>{subscriptions.length} saved subscriptions</h2>
+                </div>
+              </div>
+              {sortedSubscriptions.length > 0 ? (
+                <div className="subscription-list">
+                  {sortedSubscriptions.map((subscription) => {
+                    const isEditingSubscription =
+                      editingSubscriptionId === subscription.id;
+                    const isConfirmingDelete =
+                      confirmingSubscriptionDeleteId === subscription.id;
+
+                    return (
+                      <article className="subscription-row" key={subscription.id}>
+                        {isEditingSubscription ? (
+                          <>
+                            <div className="subscription-form-grid inline">
+                              <label>
+                                Name
+                                <input
+                                  value={editingSubscriptionForm.name}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "name",
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Amount
+                                <input
+                                  min="0"
+                                  step="0.01"
+                                  type="number"
+                                  value={editingSubscriptionForm.amount}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "amount",
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Next renewal
+                                <input
+                                  type="date"
+                                  value={editingSubscriptionForm.nextRenewalDate}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "nextRenewalDate",
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Category
+                                <select
+                                  value={editingSubscriptionForm.categoryId}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "categoryId",
+                                      event.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="">Uncategorized</option>
+                                  {getSelectableCategories(
+                                    subscription.categoryId
+                                  ).map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                      {category.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                Cadence
+                                <select
+                                  value={editingSubscriptionForm.cadence}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "cadence",
+                                      event.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="weekly">Weekly</option>
+                                  <option value="monthly">Monthly</option>
+                                  <option value="yearly">Yearly</option>
+                                </select>
+                              </label>
+                              <label>
+                                Remind days before
+                                <input
+                                  min="0"
+                                  step="1"
+                                  type="number"
+                                  value={editingSubscriptionForm.reminderDaysBefore}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "reminderDaysBefore",
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Status
+                                <select
+                                  value={editingSubscriptionForm.status}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "status",
+                                      event.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="active">Active</option>
+                                  <option value="paused">Paused</option>
+                                  <option value="cancelled">Cancelled</option>
+                                </select>
+                              </label>
+                              <label className="subscription-notes-field">
+                                Notes
+                                <textarea
+                                  value={editingSubscriptionForm.notes}
+                                  onChange={(event) =>
+                                    updateEditingSubscriptionForm(
+                                      "notes",
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                            </div>
+                            <div className="transaction-actions">
+                              <button
+                                className="primary-action compact"
+                                type="button"
+                                onClick={() => saveSubscriptionEdit(subscription.id)}
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="ghost-action compact"
+                                type="button"
+                                onClick={cancelEditingSubscription}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <strong>{subscription.name}</strong>
+                              <span>
+                                {categoryById.get(subscription.categoryId)?.name ||
+                                  "Uncategorized"}
+                              </span>
+                            </div>
+                            <div>{formatMoney(subscription.amount)}</div>
+                            <div>{formatType(subscription.cadence || "monthly")}</div>
+                            <div>{subscription.nextRenewalDate}</div>
+                            <div>{formatType(subscription.status || "active")}</div>
+                            <div className="transaction-actions">
+                              <button
+                                className="icon-action"
+                                type="button"
+                                aria-label={`Edit ${subscription.name}`}
+                                onClick={() => startEditingSubscription(subscription)}
+                              >
+                                <FaEdit aria-hidden="true" />
+                              </button>
+                              <button
+                                className={`icon-action danger ${
+                                  isConfirmingDelete ? "confirming" : ""
+                                }`}
+                                type="button"
+                                aria-label={
+                                  isConfirmingDelete
+                                    ? `Confirm delete ${subscription.name}`
+                                    : `Delete ${subscription.name}`
+                                }
+                                onClick={() => deleteSubscription(subscription.id)}
+                              >
+                                <FaTrash aria-hidden="true" />
+                              </button>
+                            </div>
+                            {isConfirmingDelete ? (
+                              <p className="delete-confirmation">
+                                Select delete again to remove this subscription.
+                              </p>
+                            ) : null}
+                          </>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-review">
+                  Add a subscription to see upcoming renewals in Reports.
+                </div>
+              )}
+            </section>
+          </div>
+        </section>
+      ) : null}
+
       {activeTab === "reports" ? (
         <section className="reports-workspace">
           <div className="report-controls">
@@ -1174,8 +1633,18 @@ export default function FinanceImportScreen() {
                 {upcomingSubscriptions.length > 0 ? (
                   upcomingSubscriptions.map((subscription) => (
                     <div className="report-list-row" key={subscription.id}>
-                      <span>{subscription.name}</span>
-                      <strong>{subscription.daysUntilRenewal} days</strong>
+                      <span>
+                        {subscription.name}
+                        <small>
+                          {categoryById.get(subscription.categoryId)?.name ||
+                            "Uncategorized"}{" "}
+                          - {subscription.nextRenewalDate}
+                        </small>
+                      </span>
+                      <strong>
+                        {formatMoney(subscription.amount)} /{" "}
+                        {formatType(subscription.cadence)}
+                      </strong>
                     </div>
                   ))
                 ) : (
