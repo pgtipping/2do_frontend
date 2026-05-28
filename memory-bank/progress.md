@@ -196,6 +196,53 @@ Additional finding:
 - The user's visible built-in browser page still showed old parser behavior, likely because the tab had not reloaded the new JavaScript bundle yet.
 - User refreshed the built-in browser tab, re-uploaded the real PDF, and confirmed the import now looks fixed.
 
+## 2026-05-28 16:00:00 - Month-name tokens stripped from category rules
+
+Follow-up to the AUT/Zelle-ref strip: extended the normalizer to also strip JAN-DEC tokens (both 3-letter and full names) so subscription descriptions like `CURSOR USAGE JAN` match `CURSOR USAGE FEB` next month. Word-boundary anchoring preserves merchant words that merely contain a month abbreviation (e.g. JUNIOR, MARSHALL, MAYTAG, AUGUSTA).
+
+Verification:
+
+- Added 2 categoryRules tests (cross-month CURSOR equivalence; false-positive guard for embedded month substrings). 54/54 tests passing.
+- Vite production build passed.
+- Live in user's Chrome tab: 7 simulated CURSOR USAGE charges across JAN–JUL all auto-matched their existing Cursor → cat_subscriptions rule.
+
+## 2026-05-28 15:45:00 - Category-rule normalizer generalizes across imports
+
+User saved their first labeled import (42 rules) and asked whether next month's same-merchant rows would auto-categorize. Empirical check showed no: rule `matchText` carried `AUT 020325` for DBCRD rows and Zelle reference codes like `503500P0LARU`, and the substring-both-ways match failed when next month's auth code or Zelle ref differed.
+
+Implemented:
+
+- `normalizeCategoryRuleText` now passes input through a `stripPerTransactionTokens` step that removes `AUT <token>`, mixed-alphanumeric tokens of 8+ chars containing both letters and digits, and standalone 6-digit tokens.
+- Card number (11 digits) and phone-digit groups are preserved so different accounts / different merchants don't collide.
+- Re-normalization happens at lookup time, so the existing 42 rules in the user's DB benefit immediately without re-saving.
+
+Verification:
+
+- New `categoryRules.test.mjs` covers AUT stripping, Zelle reference stripping, preservation of card/phone/merchant tokens, learned-rule match across different AUT codes, legacy-rule re-normalization, and different-merchant non-collision (52/52 tests passing overall).
+- Vite production build passed.
+- Live verification in user's Chrome tab: 6 simulated next-month transactions (EMF K LOVE, WALMART COM, RHODE ISLAND ENE, two Zelle sends, MOBILE DEPOSIT) all auto-matched the user's 42 saved rules.
+
+## 2026-05-28 15:30:00 - Ledger defaults to "All months"
+
+User reported that the Ledger hid most of their imported transactions because it filtered by single calendar month. With one TD statement spanning Feb 04 - Mar 03 2025, 38 transactions fell in 2025-02 and 8 in 2025-03; the picker defaulted to March, so only 8 of 46 were visible and totals were month-scoped.
+
+Implemented:
+
+- New `ALL_MONTHS` constant in `reports.js`.
+- `calculateMonthlySummary` and `calculateCategorySpending` aggregate across every transaction when `month === ALL_MONTHS` (or unset).
+- `FinanceImportScreen` initial `selectedMonth` is `ALL_MONTHS`; no auto-jump to latest calendar month on load.
+- Both Ledger and Reports month dropdowns prepend `All months`. Per-month drill-down still works.
+- Ledger panel heading shows `<N> saved transactions` in "All months" mode.
+
+Verification:
+
+- Added 2 tests covering `ALL_MONTHS` aggregation for monthly summary and category spending.
+- Finance/import tests: 46 passed.
+- Vite production build: passed.
+- Verified live in user's Chrome tab: 46 rows visible; Income $306, Spending $1,949.22, Left over -$1,643.22; dropdown lists `All months`, `2025-02`, `2025-03`.
+
+Pending: multi-PDF upload (combine multiple statements into one Ledger).
+
 ## 2026-05-28 14:45:00 - Duplicate Uncategorized in dropdowns fixed
 
 Removed the `Uncategorized` entry from `DEFAULT_CATEGORY_DEFINITIONS`. The empty-value option in every category `<select>` is the canonical "no category" choice (categoryId = null) and the UI fallback already labels missing categories as "Uncategorized," so the default `cat_uncategorized` entry was redundant and visibly duplicated in dropdowns.

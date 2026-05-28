@@ -251,6 +251,74 @@ Verification:
 
 Outstanding cosmetic note (pre-existing, not blocking): the visible categories list includes both the empty-value `Uncategorized` option and the default `cat_uncategorized` entry, so `Uncategorized` shows up twice. Defer unless the user wants it fixed.
 
+## 2026-05-28 16:00:00 - Month-name tokens stripped from category rule normalizer
+
+User-flagged edge case: subscription descriptions that embed the month name (e.g. `CURSOR USAGE JAN CURSOR COM * NY`) would still fail to match the same merchant in February or March even after the AUT/Zelle-ref strip, because the month abbreviation is part of the merchant text itself.
+
+Current local fix:
+
+- Extended `stripPerTransactionTokens` in `categoryRules.js` with `MONTH_TOKEN_PATTERN` covering 3-letter abbreviations and full names: JAN(UARY), FEB(RUARY), MAR(CH), APR(IL), MAY, JUN(E), JUL(Y), AUG(UST), SEP(TEMBER), OCT(OBER), NOV(EMBER), DEC(EMBER).
+- `\b` boundaries ensure words that merely contain a month abbreviation (JUNIOR, MARSHALL, MAYTAG, AUGUSTA) are NOT stripped.
+- Like the prior strips, lookup re-normalizes at read time, so existing rules benefit immediately.
+
+Verification:
+
+- Added 2 tests: month-token strip across JAN/FEB/MARCH normalizing to the same string; merchant words containing month abbreviations are preserved.
+- Finance/import tests: 54 passed (added 2).
+- Vite production build: passed.
+- Live verification in user's Chrome tab: 7 simulated Cursor charges with month tokens JAN–JUL all auto-matched the user's existing `cat_subscriptions` Cursor rule.
+
+## 2026-05-28 15:45:00 - Category-rule normalizer strips per-transaction tokens
+
+User saved their first import with full categorization (46 transactions, 42 rules created), then asked whether learned rules will auto-apply on next month's PDF. Inspection showed they would NOT have matched because rule `matchText` baked in per-transaction tokens (TD `AUT 020325` auth code on DBCRD rows, alphanumeric Zelle reference like `503500P0LARU`).
+
+Verified empirically: a rule built from "DBCRD ... AUT 020325 ... EMF K LOVE ..." against next-month text "DBCRD ... AUT 040525 ... EMF K LOVE ..." returned no substring match in either direction → no auto-categorization.
+
+Current local fix:
+
+- Added `stripPerTransactionTokens` step to `normalizeCategoryRuleText` in `categoryRules.js`. It strips:
+  - `AUT <token>` patterns (TD POS/DBCRD auth codes)
+  - Mixed-alphanumeric tokens ≥ 8 chars containing both letters and digits (Zelle reference codes, generic order/reference IDs)
+  - Standalone 6-digit tokens
+- Order: uppercase → strip money → `stripPerTransactionTokens` → non-alphanumeric → trim/collapse.
+- 11-digit masked card number is preserved (account distinguisher). Phone-digit groups (`800 525 5683`) are preserved (merchant distinguisher). Merchant words are preserved.
+
+Existing 42 saved rules benefit immediately — `findCategoryRuleForTransaction` re-normalizes `matchText` at lookup time, so legacy rules go through the new normalizer on every comparison without needing to be re-saved.
+
+Verification:
+
+- Added `src/finance/__tests__/categoryRules.test.mjs` with 6 tests: AUT stripping, Zelle reference stripping, card-number / phone / merchant preservation, learned-rule match across different AUT, legacy-rule re-normalization, different-merchant non-collision.
+- Finance/import tests: 52 passed (added 6).
+- Vite production build: passed.
+- Live verification in user's Chrome tab against the 42 saved rules: 6 simulated next-month transactions (EMF K LOVE, WALMART COM, RHODE ISLAND ENE, two Zelle sends with different ref codes, MOBILE DEPOSIT) all auto-matched correctly.
+
+## 2026-05-28 15:30:00 - Ledger "All months" default
+
+User reported that the Ledger view "doesn't show all transactions so totals are wrong" and that "Left over doesn't make sense if balance from previous month + income isn't captured." Inspection of the live IndexedDB showed 46 saved transactions from one imported TD statement (period Feb 04 - Mar 03 2025): 38 dated in 2025-02 and 8 dated in 2025-03. The Ledger month picker defaulted to the latest month present (2025-03), so the user only saw 8 of 46 transactions and "Left over" was computed off March alone, ignoring the rest of the statement.
+
+User's mental model: one PDF upload = one bucket (statement / billing cycle), not a per-calendar-month split. Multi-PDF upload is a planned future feature.
+
+Current local fix:
+
+- Added `ALL_MONTHS = "all"` constant in `reports.js`.
+- `calculateMonthlySummary` and `calculateCategorySpending` now treat `month === ALL_MONTHS` (or missing) as "aggregate across every transaction."
+- `FinanceImportScreen` initializes `selectedMonth` to `ALL_MONTHS` and no longer auto-jumps to the latest calendar month on load. It still falls back to `ALL_MONTHS` if the previously-selected calendar month is no longer in the data.
+- Both Ledger and Reports month dropdowns prepend an `All months` option. Drill-down by specific calendar month still works.
+- Ledger panel heading now reads `<N> saved transactions` when "All months" is selected; per-month heading is unchanged.
+- Reports `h2` shows "All months" when no calendar month is selected.
+
+Verification:
+
+- Added test: `calculateMonthlySummary` aggregates across every transaction when `month === ALL_MONTHS`.
+- Added test: `calculateCategorySpending` aggregates across every transaction when `month === ALL_MONTHS`.
+- Finance/import tests: 46 passed.
+- Vite production build: passed.
+- Verified live in the user's Chrome tab after reload: Ledger shows 46 transactions with Income $306, Spending $1,949.22, Left over -$1,643.22; dropdown shows `All months`, `2025-02`, `2025-03`.
+
+Outstanding follow-up (per user): multi-PDF upload support so multiple statements can be combined into one Ledger view.
+
+Follow-up note: user clarified that the per-month split was technically correct (the TD statement is dated by its last entry date, so a "March statement" actually covers most of February plus a few March days). The original Ledger logic was not wrong — but the user is keeping "All months" as the default because it gives the overview they want by default; per-month drill-down is still available in the dropdown.
+
 ## 2026-05-28 14:45:00 - Duplicate Uncategorized fix
 
 Removed `["uncategorized", "Uncategorized", "mixed", "#6b7280"]` from `DEFAULT_CATEGORY_DEFINITIONS`. The empty-value option in every category `<select>` already represents "no category" (categoryId = null) and the lookup `categoryById.get(transaction.categoryId)?.name || "Uncategorized"` already falls back to the same label for null. The default `cat_uncategorized` entry was redundant and showed up as a second "Uncategorized" row in dropdowns.

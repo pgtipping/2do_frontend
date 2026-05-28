@@ -1,3 +1,5 @@
+export const ALL_MONTHS = "all";
+
 function getMonthKey(date) {
   return date.slice(0, 7);
 }
@@ -6,12 +8,19 @@ function absoluteAmount(amount) {
   return Math.abs(Number(amount) || 0);
 }
 
+function isInMonth(transaction, month) {
+  if (!month || month === ALL_MONTHS) {
+    return true;
+  }
+  return getMonthKey(transaction.date) === month;
+}
+
 export function calculateMonthlySummary(
   transactions,
   { month, includeSelfTransfers = false } = {}
 ) {
   return transactions
-    .filter((transaction) => getMonthKey(transaction.date) === month)
+    .filter((transaction) => isInMonth(transaction, month))
     .reduce(
       (summary, transaction) => {
         const amount = absoluteAmount(transaction.amount);
@@ -47,7 +56,7 @@ export function calculateMonthlySummary(
 
 export function calculateCategorySpending(transactions, { month } = {}) {
   return transactions
-    .filter((transaction) => getMonthKey(transaction.date) === month)
+    .filter((transaction) => isInMonth(transaction, month))
     .filter((transaction) =>
       ["expense", "transfer_to_other"].includes(transaction.type)
     )

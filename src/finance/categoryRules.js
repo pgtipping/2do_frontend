@@ -1,7 +1,33 @@
+// Tokens that change per transaction (auth codes, payment reference IDs,
+// in-description month names) must be stripped before category-rule
+// comparison, otherwise two charges at the same merchant in different
+// months never match.
+//
+// Examples:
+//   TD POS / DBCRD rows: "...AUT 020325 VISA DDA PUR AP..." — the 6-digit
+//     auth code differs per charge.
+//   TD Zelle rows: "TD ZELLE SENT, 503500P0LARU Zelle JUSTUS GEORGE" —
+//     the alphanumeric reference token differs per transfer.
+//   Subscription merchant text: "CURSOR USAGE JAN CURSOR COM * NY" —
+//     the month abbreviation rolls over each cycle (JAN, FEB, MAR, ...).
+//
+// Strip all three shapes before falling through to the existing money +
+// non-alphanumeric normalization.
+const MONTH_TOKEN_PATTERN =
+  /\b(JAN(UARY)?|FEB(RUARY)?|MAR(CH)?|APR(IL)?|MAY|JUN(E)?|JUL(Y)?|AUG(UST)?|SEP(TEMBER)?|OCT(OBER)?|NOV(EMBER)?|DEC(EMBER)?)\b/g;
+
+function stripPerTransactionTokens(value) {
+  return value
+    .replace(/\bAUT\s+[A-Z0-9]+\b/g, " ")
+    .replace(/\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{8,}\b/g, " ")
+    .replace(/\b\d{6}\b/g, " ")
+    .replace(MONTH_TOKEN_PATTERN, " ");
+}
+
 export function normalizeCategoryRuleText(value) {
-  return String(value || "")
-    .toUpperCase()
-    .replace(/\$?[\d,]+\.\d{2}/g, " ")
+  const upper = String(value || "").toUpperCase();
+
+  return stripPerTransactionTokens(upper.replace(/\$?[\d,]+\.\d{2}/g, " "))
     .replace(/[^A-Z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");

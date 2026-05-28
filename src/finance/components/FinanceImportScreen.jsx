@@ -19,6 +19,7 @@ import { extractTextFromPdfFile } from "../imports/pdfTextExtractor";
 import { parseTdBankStatementText } from "../imports/tdBankStatementParser";
 import { createReviewedImportDraft } from "../imports/reviewedImportDraft";
 import {
+  ALL_MONTHS,
   calculateCategorySpending,
   calculateMonthlySummary,
   getUpcomingSubscriptions,
@@ -114,7 +115,7 @@ export default function FinanceImportScreen() {
   const [pdfStatus, setPdfStatus] = useState("");
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [financeData, setFinanceData] = useState(null);
-  const [selectedMonth, setSelectedMonth] = useState("2025-01");
+  const [selectedMonth, setSelectedMonth] = useState(ALL_MONTHS);
   const [includeSelfTransfers, setIncludeSelfTransfers] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState(null);
   const [transactionForm, setTransactionForm] = useState(null);
@@ -154,8 +155,12 @@ export default function FinanceImportScreen() {
 
     setFinanceData(hydratedData);
 
-    if (months.length > 0 && !months.includes(selectedMonth)) {
-      setSelectedMonth(months[months.length - 1]);
+    if (
+      selectedMonth !== ALL_MONTHS &&
+      months.length > 0 &&
+      !months.includes(selectedMonth)
+    ) {
+      setSelectedMonth(ALL_MONTHS);
     }
   };
 
@@ -633,7 +638,11 @@ export default function FinanceImportScreen() {
     daysAhead: 30,
   });
   const monthTransactions = transactions
-    .filter((transaction) => getMonthKey(transaction.date) === selectedMonth)
+    .filter((transaction) =>
+      selectedMonth === ALL_MONTHS
+        ? true
+        : getMonthKey(transaction.date) === selectedMonth
+    )
     .sort((first, second) => second.date.localeCompare(first.date));
   const categoryById = new Map(
     categories.map((category) => [category.id, category])
@@ -887,7 +896,11 @@ export default function FinanceImportScreen() {
           <div className="panel-heading ledger-heading">
             <div>
               <p className="eyebrow">Ledger</p>
-              <h2>{selectedMonth} transactions</h2>
+              <h2>
+                {selectedMonth === ALL_MONTHS
+                  ? `${monthTransactions.length} saved transactions`
+                  : `${selectedMonth} transactions`}
+              </h2>
             </div>
             <select
               className="month-select"
@@ -895,7 +908,9 @@ export default function FinanceImportScreen() {
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
             >
+              <option value={ALL_MONTHS}>All months</option>
               {[selectedMonth, ...monthOptions]
+                .filter((month) => month && month !== ALL_MONTHS)
                 .filter((month, index, months) => months.indexOf(month) === index)
                 .map((month) => (
                   <option key={month} value={month}>
@@ -1641,7 +1656,9 @@ export default function FinanceImportScreen() {
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
             >
+              <option value={ALL_MONTHS}>All months</option>
               {[selectedMonth, ...monthOptions]
+                .filter((month) => month && month !== ALL_MONTHS)
                 .filter((month, index, months) => months.indexOf(month) === index)
                 .map((month) => (
                   <option key={month} value={month}>
@@ -1662,7 +1679,7 @@ export default function FinanceImportScreen() {
           <div className="report-grid">
             <section className="report-main">
               <p className="eyebrow">Monthly report</p>
-              <h2>{selectedMonth}</h2>
+              <h2>{selectedMonth === ALL_MONTHS ? "All months" : selectedMonth}</h2>
               <div className="cashflow-bars" aria-label="Monthly cashflow chart">
                 <div
                   style={{

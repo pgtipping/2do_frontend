@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  ALL_MONTHS,
   calculateCategorySpending,
   calculateMonthlyCashflow,
+  calculateMonthlySummary,
   getUpcomingSubscriptions,
 } from "../reports.js";
 
@@ -39,6 +41,22 @@ test("category spending excludes self transfers by default", () => {
     cat_groceries: 42.91,
     cat_transfers: 75,
   });
+});
+
+test("category spending aggregates across all months when month is ALL_MONTHS", () => {
+  assert.deepEqual(calculateCategorySpending(transactions, { month: ALL_MONTHS }), {
+    cat_groceries: 42.91,
+    cat_transfers: 75,
+  });
+});
+
+test("monthly summary aggregates across all months when month is ALL_MONTHS", () => {
+  const summary = calculateMonthlySummary(transactions, { month: ALL_MONTHS });
+
+  assert.equal(summary.income, 2500);
+  assert.equal(summary.expenses, 117.91);
+  assert.equal(summary.selfTransfers, 300);
+  assert.equal(summary.net, 2500 - 117.91);
 });
 
 test("monthly cashflow returns sorted month summaries", () => {

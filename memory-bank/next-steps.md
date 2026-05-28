@@ -15,6 +15,8 @@ Why this is next:
 - Import review rows no longer get vertically compressed by the review table's `max-height`, so warning reasons text no longer leaks past the row into the reconciliation strip below.
 - TD DBCRD card transactions no longer drop the merchant tail line, so review rows show `EMF K LOVE`, `RHODE ISLAND ENE`, `WALMART COM`, etc. instead of identical generic `DBCRD PUR AP ... VISA DDA PUR AP` text.
 - Category dropdowns (Import review row, Ledger edit, Subscription create, Subscription edit) now expose `+ Add new category…` inline, so labeling a transaction with a new category (e.g. Parking) no longer requires switching tabs.
+- Ledger view defaults to "All months" so one-statement imports show every saved transaction with correct totals; per-calendar-month drill-down still available from the dropdown.
+- Multi-PDF / multi-statement upload is the next requested feature so multiple statements can be combined in one Ledger view.
 - Subscription create/edit/delete is implemented locally.
 - Reports now shows real upcoming renewals from saved subscriptions.
 - Finance tests, production build, `git diff --check`, and focused parser checks passed for the current app.
