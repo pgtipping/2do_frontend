@@ -11,6 +11,7 @@ import {
   FaTags,
   FaTrash,
 } from "react-icons/fa";
+import { mergeCategoriesWithDefaults } from "../categories";
 import { createDefaultCategories } from "../defaultCategories";
 import { createCategory, createSubscription } from "../domain";
 import { createFinanceRepository } from "../storage/localFinanceStore";
@@ -131,8 +132,10 @@ export default function FinanceImportScreen() {
     useState(null);
   const defaultCategories = useMemo(() => createDefaultCategories(), []);
   const repository = useMemo(() => createFinanceRepository(), []);
-  const categories =
-    financeData?.categories?.length > 0 ? financeData.categories : defaultCategories;
+  const categories = mergeCategoriesWithDefaults(
+    defaultCategories,
+    financeData?.categories || []
+  );
   const visibleCategories = categories.filter((category) => !category.archivedAt);
   const hiddenCategories = categories.filter((category) => category.archivedAt);
   const transactions = financeData?.transactions || [];
@@ -143,7 +146,7 @@ export default function FinanceImportScreen() {
     const data = await repository.loadData();
     const hydratedData = {
       ...data,
-      categories: data.categories.length > 0 ? data.categories : defaultCategories,
+      categories: mergeCategoriesWithDefaults(defaultCategories, data.categories),
     };
     const months = Array.from(
       new Set(hydratedData.transactions.map((transaction) => getMonthKey(transaction.date)))
@@ -238,6 +241,45 @@ export default function FinanceImportScreen() {
           : row
       ),
     }));
+  };
+
+  const createInlineCategory = async () => {
+    const rawName =
+      typeof window !== "undefined" ? window.prompt("New category name") : "";
+    const categoryName = (rawName || "").trim();
+
+    if (!categoryName) {
+      return null;
+    }
+
+    const newCategory = createCategory({
+      createId: repository.createId,
+      now: repository.now,
+      name: categoryName,
+      type: "expense",
+      color: DEFAULT_CATEGORY_FORM.color,
+      sortOrder: categories.length,
+    });
+
+    await repository.saveCategory(newCategory);
+    await loadFinanceData();
+    return newCategory.id;
+  };
+
+  const handleCategorySelectChange = async (event, applyId) => {
+    const value = event.target.value;
+
+    if (value === "__create__") {
+      const newId = await createInlineCategory();
+
+      if (newId) {
+        applyId(newId);
+      }
+
+      return;
+    }
+
+    applyId(value);
   };
 
   const saveSelectedRows = async () => {
@@ -405,13 +447,16 @@ export default function FinanceImportScreen() {
 
   const saveCategoryEdit = async (categoryId) => {
     const categoryName = categoryForm.name.trim();
+    const currentCategory = categories.find((category) => category.id === categoryId);
 
-    if (!categoryName) {
+    if (!categoryName || !currentCategory) {
       return;
     }
 
-    await repository.updateCategory(categoryId, {
+    await repository.saveCategory({
+      ...currentCategory,
       color: categoryForm.color,
+      id: categoryId,
       name: categoryName,
       type: categoryForm.type,
     });
@@ -420,12 +465,30 @@ export default function FinanceImportScreen() {
   };
 
   const archiveCategory = async (categoryId) => {
-    await repository.archiveCategory(categoryId);
+    const currentCategory = categories.find((category) => category.id === categoryId);
+
+    if (!currentCategory) {
+      return;
+    }
+
+    await repository.saveCategory({
+      ...currentCategory,
+      archivedAt: repository.now(),
+    });
     await loadFinanceData();
   };
 
   const restoreCategory = async (categoryId) => {
-    await repository.restoreCategory(categoryId);
+    const currentCategory = categories.find((category) => category.id === categoryId);
+
+    if (!currentCategory) {
+      return;
+    }
+
+    await repository.saveCategory({
+      ...currentCategory,
+      archivedAt: null,
+    });
     await loadFinanceData();
   };
 
@@ -676,14 +739,22 @@ export default function FinanceImportScreen() {
               </button>
             </div>
           </div>
+          {pdfStatus ? (
+            <p aria-live="polite" className="pdf-status" role="status">
+              {pdfStatus}
+            </p>
+          ) : null}
+          {errorMessage ? (
+            <p className="error-message" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
           <textarea
             aria-label="TD Bank statement text"
             value={statementText}
             onChange={(event) => setStatementText(event.target.value)}
             spellCheck="false"
           />
-          {pdfStatus ? <p className="pdf-status">{pdfStatus}</p> : null}
-          {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
         </div>
 
         <div className="review-panel">
@@ -739,7 +810,9 @@ export default function FinanceImportScreen() {
                       aria-label={`Category for ${row.transaction.description}`}
                       value={row.transaction.categoryId || ""}
                       onChange={(event) =>
-                        updateRowCategory(row.id, event.target.value)
+                        handleCategorySelectChange(event, (id) =>
+                          updateRowCategory(row.id, id)
+                        )
                       }
                     >
                       <option value="">Uncategorized</option>
@@ -748,6 +821,7 @@ export default function FinanceImportScreen() {
                           {category.name}
                         </option>
                       ))}
+                      <option value="__create__">+ Add new category…</option>
                     </select>
                     {row.categorySource === "learned" ? (
                       <span>Learned</span>
@@ -886,7 +960,9 @@ export default function FinanceImportScreen() {
                             <select
                               value={transactionForm.categoryId}
                               onChange={(event) =>
-                                updateTransactionForm("categoryId", event.target.value)
+                                handleCategorySelectChange(event, (id) =>
+                                  updateTransactionForm("categoryId", id)
+                                )
                               }
                             >
                               <option value="">Uncategorized</option>
@@ -897,6 +973,7 @@ export default function FinanceImportScreen() {
                                   {category.name}
                                 </option>
                               ))}
+                              <option value="__create__">+ Add new category…</option>
                             </select>
                           </label>
                           <label className="transaction-notes-field">
@@ -1261,7 +1338,9 @@ export default function FinanceImportScreen() {
                   <select
                     value={subscriptionForm.categoryId}
                     onChange={(event) =>
-                      updateSubscriptionForm("categoryId", event.target.value)
+                      handleCategorySelectChange(event, (id) =>
+                        updateSubscriptionForm("categoryId", id)
+                      )
                     }
                   >
                     <option value="">Uncategorized</option>
@@ -1270,6 +1349,7 @@ export default function FinanceImportScreen() {
                         {category.name}
                       </option>
                     ))}
+                    <option value="__create__">+ Add new category…</option>
                   </select>
                 </label>
                 <label>
@@ -1398,9 +1478,11 @@ export default function FinanceImportScreen() {
                                 <select
                                   value={editingSubscriptionForm.categoryId}
                                   onChange={(event) =>
-                                    updateEditingSubscriptionForm(
-                                      "categoryId",
-                                      event.target.value
+                                    handleCategorySelectChange(event, (id) =>
+                                      updateEditingSubscriptionForm(
+                                        "categoryId",
+                                        id
+                                      )
                                     )
                                   }
                                 >
@@ -1412,6 +1494,7 @@ export default function FinanceImportScreen() {
                                       {category.name}
                                     </option>
                                   ))}
+                                  <option value="__create__">+ Add new category…</option>
                                 </select>
                               </label>
                               <label>

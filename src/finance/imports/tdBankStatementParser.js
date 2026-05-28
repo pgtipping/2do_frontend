@@ -17,10 +17,16 @@ const ACTIVITY_SECTIONS = new Set([
   "Deposits",
   "Electronic Deposits",
   "Electronic Payments",
+  "Other Withdrawals",
+  "Withdrawals",
+  "Checks Paid",
 ]);
+
+const CREDIT_SECTIONS = new Set(["Deposits", "Electronic Deposits"]);
 
 const STOP_SECTIONS = [
   "How to Balance your Account",
+  "DAILY BALANCE SUMMARY",
   "Error Resolution Notice",
   "Finance Charge",
   "Important Account Information",
@@ -108,8 +114,9 @@ function resolvePostingDate(postingDate, statementPeriod) {
 
 function classifyTransaction(section, narration) {
   const upperNarration = narration.toUpperCase();
+  const compactNarration = upperNarration.replace(/\s+/g, "");
 
-  if (upperNarration.includes("TD ZELLESENT")) {
+  if (compactNarration.includes("TDZELLESENT")) {
     return {
       type: "transfer_to_other",
       counterpartyType: "external_person",
@@ -118,7 +125,7 @@ function classifyTransaction(section, narration) {
     };
   }
 
-  if (upperNarration.includes("TD ZELLERECEIVED")) {
+  if (compactNarration.includes("TDZELLERECEIVED")) {
     return {
       type: "income",
       counterpartyType: "external_person",
@@ -150,8 +157,8 @@ function classifyTransaction(section, narration) {
   }
 
   if (
-    upperNarration.includes("PAYPALTRANSFER") ||
-    upperNarration.includes("ELECTRONICPMT-WEB")
+    compactNarration.includes("PAYPALTRANSFER") ||
+    compactNarration.includes("ELECTRONICPMT-WEB")
   ) {
     return {
       type: "expense",
@@ -200,7 +207,7 @@ function buildFingerprint({ date, narration, signedAmount }) {
 function createTransaction({ section, statementPeriod, postingDate, narration, amount }) {
   const date = resolvePostingDate(postingDate, statementPeriod);
   const classification = classifyTransaction(section, narration);
-  const isDebitSection = section === "Electronic Payments";
+  const isDebitSection = !CREDIT_SECTIONS.has(section);
   const signedAmount = isDebitSection ? -Math.abs(amount) : Math.abs(amount);
 
   return {
@@ -228,6 +235,12 @@ function isSectionHeader(line) {
   return ACTIVITY_SECTIONS.has(line);
 }
 
+function resolveSectionHeader(line) {
+  const normalizedLine = line.replace(/\s+\(continued\)$/i, "");
+
+  return isSectionHeader(normalizedLine) ? normalizedLine : null;
+}
+
 function isStopSection(line) {
   return STOP_SECTIONS.some((stopSection) => line.startsWith(stopSection));
 }
@@ -242,9 +255,9 @@ function parseTransactionStartLine(line) {
 
 function finalizePendingRow(pendingRow) {
   const fullNarration = pendingRow.narrationLines.join(" ");
-  const amountMatch = fullNarration.match(/(-?\$?[\d,]+\.\d{2})$/);
+  const amountMatches = [...fullNarration.matchAll(/(-?\$?[\d,]+\.\d{2})/g)];
 
-  if (!amountMatch) {
+  if (amountMatches.length === 0) {
     return {
       ...pendingRow,
       narration: fullNarration,
@@ -252,11 +265,28 @@ function finalizePendingRow(pendingRow) {
     };
   }
 
+  const lastMatch = amountMatches[amountMatches.length - 1];
+  const before = fullNarration.slice(0, lastMatch.index).trim();
+  const after = fullNarration.slice(lastMatch.index + lastMatch[0].length).trim();
+  const narration = `${before} ${after}`.trim().replace(/\s+/g, " ");
+
   return {
     ...pendingRow,
-    narration: fullNarration.slice(0, amountMatch.index).trim(),
-    amount: parseMoney(amountMatch[1]),
+    narration,
+    amount: parseMoney(lastMatch[1]),
   };
+}
+
+function pendingRowHasTerminalAmount(pendingRow) {
+  return /(-?\$?[\d,]+\.\d{2})$/.test(pendingRow.narrationLines.join(" "));
+}
+
+function isMerchantTailLine(line) {
+  // TD POS / DBCRD merchant tail lines end with "* XX" where XX is a 2-letter
+  // state or region code (e.g. "EMF K LOVE 800 525 5683 * CA"). Page-break
+  // boilerplate ("STATEMENT OF ACCOUNT", "Call 1-800-...", "Page: 4 of 5")
+  // never matches this signature.
+  return /\*\s+[A-Z]{2}$/.test(line);
 }
 
 function parseActivity(text, statementPeriod) {
@@ -295,9 +325,11 @@ function parseActivity(text, statementPeriod) {
       continue;
     }
 
-    if (isSectionHeader(line)) {
+    const sectionHeader = resolveSectionHeader(line);
+
+    if (sectionHeader) {
       flushPendingRow();
-      currentSection = line;
+      currentSection = sectionHeader;
       continue;
     }
 
@@ -313,6 +345,7 @@ function parseActivity(text, statementPeriod) {
         section: currentSection,
         expectedTotal: parseMoney(subtotalMatch[1]),
       });
+      currentSection = null;
       continue;
     }
 
@@ -320,9 +353,13 @@ function parseActivity(text, statementPeriod) {
 
     if (transactionMatch) {
       flushPendingRow();
+      // Route single-line transactions through the same pending-row pipeline so
+      // a merchant tail on the next line (e.g. "EMF K LOVE 800 525 5683 * CA")
+      // can still be appended before the row is finalized.
       pendingRow = {
         postingDate: transactionMatch[1],
         narrationLines: [`${transactionMatch[2]} ${transactionMatch[3]}`],
+        saturated: false,
       };
       continue;
     }
@@ -334,11 +371,28 @@ function parseActivity(text, statementPeriod) {
       pendingRow = {
         postingDate: transactionStartMatch[1],
         narrationLines: [transactionStartMatch[2]],
+        saturated: false,
       };
       continue;
     }
 
     if (pendingRow) {
+      if (pendingRow.saturated) {
+        flushPendingRow();
+        continue;
+      }
+
+      if (pendingRowHasTerminalAmount(pendingRow)) {
+        if (isMerchantTailLine(line)) {
+          pendingRow.narrationLines.push(line);
+          pendingRow.saturated = true;
+          continue;
+        }
+
+        flushPendingRow();
+        continue;
+      }
+
       pendingRow.narrationLines.push(line);
     }
   }
@@ -352,18 +406,27 @@ function parseActivity(text, statementPeriod) {
 }
 
 function reconcileSections(transactions, sectionTotals) {
-  return sectionTotals.map((sectionTotal) => {
+  const sectionNames = Array.from(
+    new Set(sectionTotals.map((sectionTotal) => sectionTotal.section))
+  );
+
+  return sectionNames.map((sectionName) => {
+    const expectedTotal = roundMoney(
+      sectionTotals
+        .filter((sectionTotal) => sectionTotal.section === sectionName)
+        .reduce((sum, sectionTotal) => sum + sectionTotal.expectedTotal, 0)
+    );
     const parsedTotal = roundMoney(
       transactions
-        .filter((transaction) => transaction.rawSection === sectionTotal.section)
+        .filter((transaction) => transaction.rawSection === sectionName)
         .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
     );
-    const difference = roundMoney(parsedTotal - sectionTotal.expectedTotal);
+    const difference = roundMoney(parsedTotal - expectedTotal);
 
     return {
-      section: sectionTotal.section,
+      section: sectionName,
       parsedTotal,
-      expectedTotal: sectionTotal.expectedTotal,
+      expectedTotal,
       difference,
       status: difference === 0 ? "matched" : "needs_review",
     };

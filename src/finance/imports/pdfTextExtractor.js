@@ -19,27 +19,48 @@ function normalizeExtractedPageText(items) {
       .trim();
   }
 
-  const lines = [];
-
-  items
+  const positionedItems = items
     .filter((item) => item.str)
-    .forEach((item) => {
-      const yPosition = item.transform?.[5] || 0;
-      const currentLine = lines.at(-1);
+    .map((item) => ({
+      text: item.str,
+      xPosition: item.transform?.[4] || 0,
+      yPosition: item.transform?.[5] || 0,
+    }))
+    .sort((firstItem, secondItem) => {
+      const yDifference = secondItem.yPosition - firstItem.yPosition;
 
-      if (!currentLine || Math.abs(currentLine.yPosition - yPosition) > 2) {
-        lines.push({
-          yPosition,
-          textParts: [item.str],
-        });
-        return;
+      if (Math.abs(yDifference) > 2) {
+        return yDifference;
       }
 
-      currentLine.textParts.push(item.str);
+      return firstItem.xPosition - secondItem.xPosition;
     });
 
+  const lines = [];
+
+  positionedItems.forEach((item) => {
+    const currentLine = lines.at(-1);
+
+    if (!currentLine || Math.abs(currentLine.yPosition - item.yPosition) > 2) {
+      lines.push({
+        yPosition: item.yPosition,
+        textParts: [item],
+      });
+      return;
+    }
+
+    currentLine.textParts.push(item);
+  });
+
   return lines
-    .map((line) => line.textParts.join(" ").replace(/\s+/g, " ").trim())
+    .map((line) =>
+      line.textParts
+        .sort((firstPart, secondPart) => firstPart.xPosition - secondPart.xPosition)
+        .map((part) => part.text)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
     .filter(Boolean)
     .join("\n");
 }

@@ -22,12 +22,11 @@ test("creates editable default finance categories with stable names", () => {
       "Utilities",
       "Subscriptions",
       "Transfers",
-      "Uncategorized",
     ]
   );
   assert.equal(categories[0].id, "cat_income");
   assert.equal(categories[0].archivedAt, null);
-  assert.equal(categories.at(-1).type, "mixed");
+  assert.equal(categories.at(-1).type, "transfer");
 });
 
 test("matches parser category suggestions to default categories", () => {
@@ -43,6 +42,6 @@ test("matches parser category suggestions to default categories", () => {
 test("creates default categories without an injected clock", () => {
   const categories = createDefaultCategories();
 
-  assert.equal(categories.length, 9);
+  assert.equal(categories.length, 8);
   assert.match(categories[0].createdAt, /^\d{4}-\d{2}-\d{2}T/);
 });

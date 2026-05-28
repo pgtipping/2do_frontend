@@ -9,7 +9,6 @@ const DEFAULT_CATEGORY_DEFINITIONS = [
   ["utilities", "Utilities", "expense", "#0369a1"],
   ["subscriptions", "Subscriptions", "expense", "#be123c"],
   ["transfers", "Transfers", "transfer", "#475569"],
-  ["uncategorized", "Uncategorized", "mixed", "#6b7280"],
 ];
 
 export function createDefaultCategories({ now } = {}) {

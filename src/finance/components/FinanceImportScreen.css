@@ -227,8 +227,12 @@
 .save-result {
   border-radius: 8px;
   font-size: 14px;
-  margin: 14px 0 0;
   padding: 12px 14px;
+}
+
+.error-message,
+.pdf-status {
+  margin: -2px 0 14px;
 }
 
 .error-message {
@@ -244,6 +248,7 @@
 .save-result {
   background: #edf8ef;
   color: #24533d;
+  margin: 14px 0 0;
 }
 
 .import-metrics {
@@ -282,12 +287,17 @@
 }
 
 .review-row {
-  align-items: center;
+  align-items: start;
   background: #ffffff;
   border: 1px solid #dfe7df;
   border-radius: 8px;
   display: grid;
+  flex-shrink: 0;
   gap: 12px;
+  grid-template-areas:
+    "select main amount status"
+    ". category category category"
+    ". reasons reasons reasons";
   grid-template-columns: 92px minmax(0, 1fr) 96px 92px;
   min-height: 76px;
   padding: 12px;
@@ -300,6 +310,8 @@
   font-size: 13px;
   font-weight: 700;
   gap: 10px;
+  grid-area: select;
+  min-width: 0;
 }
 
 .row-select input {
@@ -312,6 +324,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  grid-area: main;
   min-width: 0;
 }
 
@@ -331,9 +344,10 @@
 .row-category {
   display: grid;
   gap: 6px;
-  grid-column: 2 / -1;
+  grid-area: category;
   grid-template-columns: minmax(150px, 220px) auto;
   justify-content: start;
+  min-width: 0;
 }
 
 .row-category select,
@@ -361,8 +375,11 @@
 
 .row-amount {
   color: #142119;
+  grid-area: amount;
   font-weight: 800;
+  justify-self: end;
   text-align: right;
+  white-space: nowrap;
 }
 
 .row-status {
@@ -372,6 +389,8 @@
   font-size: 12px;
   font-weight: 800;
   gap: 6px;
+  grid-area: status;
+  justify-self: start;
   justify-content: center;
   padding: 7px 10px;
   width: fit-content;
@@ -390,9 +409,9 @@
 .row-reasons {
   color: #7a5a12;
   font-size: 12px;
-  grid-column: 2 / -1;
+  grid-area: reasons;
   line-height: 1.45;
-  margin: -2px 0 0;
+  margin: 0;
 }
 
 .empty-review {
@@ -937,6 +956,18 @@
     padding: 18px;
   }
 
+  .workspace-tabs {
+    display: flex;
+    overflow-x: auto;
+    scroll-padding: 6px;
+  }
+
+  .workspace-tabs button {
+    flex: 0 0 auto;
+    min-width: 126px;
+    padding: 0 14px;
+  }
+
   .finance-hero,
   .hero-actions,
   .report-controls {
@@ -961,12 +992,23 @@
     grid-template-columns: 1fr;
   }
 
+  .review-row {
+    grid-template-areas:
+      "select"
+      "main"
+      "category"
+      "amount"
+      "status"
+      "reasons";
+  }
+
   .source-actions {
     align-items: stretch;
     flex-direction: column;
   }
 
   .row-amount {
+    justify-self: start;
     text-align: left;
   }
 
@@ -988,12 +1030,7 @@
     justify-content: start;
   }
 
-  .row-reasons {
-    grid-column: 1;
-  }
-
   .row-category {
-    grid-column: 1;
     grid-template-columns: 1fr;
   }
 

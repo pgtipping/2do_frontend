@@ -65,6 +65,41 @@ test("preserves PDF line breaks when text items include vertical positions", asy
   );
 });
 
+test("orders positioned PDF text by visible row and column", async () => {
+  const file = {
+    type: "application/pdf",
+    async arrayBuffer() {
+      return new ArrayBuffer(8);
+    },
+  };
+  const text = await extractTextFromPdfFile(file, {
+    loadPdfDocument: async () => ({
+      numPages: 1,
+      async getPage() {
+        return {
+          async getTextContent() {
+            return {
+              items: [
+                { str: "AMOUNT", transform: [1, 0, 0, 1, 420, 700] },
+                { str: "POSTING DATE", transform: [1, 0, 0, 1, 72, 700] },
+                { str: "DESCRIPTION", transform: [1, 0, 0, 1, 160, 700] },
+                { str: "800.00", transform: [1, 0, 0, 1, 420, 682] },
+                { str: "12/20", transform: [1, 0, 0, 1, 72, 682] },
+                { str: "TD ZELLESENT JOHN DOE", transform: [1, 0, 0, 1, 160, 682] },
+              ],
+            };
+          },
+        };
+      },
+    }),
+  });
+
+  assert.equal(
+    text,
+    "POSTING DATE DESCRIPTION AMOUNT\n12/20 TD ZELLESENT JOHN DOE 800.00"
+  );
+});
+
 test("rejects non-PDF files before reading", async () => {
   const file = {
     type: "text/plain",
