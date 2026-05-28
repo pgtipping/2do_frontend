@@ -409,3 +409,36 @@ Verification:
 - Production build: passed with Vite.
 - `git diff --check`: passed.
 - Playwright browser check at viewport widths 1280, 1024, and 700 (mobile) — every `.review-row` has `scrollHeight <= offsetHeight` (no overflow), with zero browser console warnings/errors.
+
+
+## 2026-05-28 17:30:00 - Duplicate finder added to Ledger
+
+User asked what happens if they save a duplicate-month import and how a find-and-remove tool would catch duplicates the save-time guard already missed. Answer: the save-time guard uses exact fingerprint (source + date + lowercased narration + absolute amount), so a useful dedup tool has to match looser to catch what the guard let through. Built it.
+
+New module `src/finance/duplicateDetection.js`:
+
+- `findSuspectedDuplicateClusters(transactions)` groups transactions by `date + absolute amount + normalized merchant text`, where the merchant text uses the existing `categoryRules` normalizer (already strips per-transaction noise: AUT auth codes, peer-to-peer reference tokens, 6-digit numbers, month words).
+- Returns clusters with 2+ members, sorted most-recent first.
+- Skips rows whose narration normalizes to empty (cannot anchor a cluster).
+- Same merchant + same amount on different dates → not flagged.
+- Same merchant + same day at different amounts → not flagged.
+- Same merchant + same day + same amount → flagged for human review (this is intentional — two real $7.49 coffees would group; the UI must let the user dismiss).
+- `getRemovalIdsForClusters(clusters, removedIdsByCluster)` flattens the per-cluster removal selections into a flat list of transaction IDs.
+
+Repository:
+
+- Added `deleteTransactions(transactionIds)` to `localFinanceStore.js` for bulk removal in one save.
+
+UI (in `FinanceImportScreen.jsx`):
+
+- Added `Find duplicates` button to the Ledger heading next to the month dropdown (disabled when fewer than 2 transactions are saved).
+- Added a review panel that opens above the transaction table. Each cluster shows date, money amount, and member count; each row has a checkbox. Default selection: the first row in each cluster stays checked-as-keep, every other row is pre-checked for removal. User can flip any checkbox.
+- "Remove selected" calls the bulk delete and reloads finance data.
+- Empty-state copy: "No duplicate clusters found across your saved transactions."
+
+Verification:
+
+- New tests in `src/finance/__tests__/duplicateDetection.test.mjs`: 11 cases covering exact duplicates, fingerprint-miss duplicates (narration drift), different merchants, different amounts, different dates, intentional same-merchant-same-day grouping, sort order, blank narration skipping, removal-id flattening, opposite-sign transfers, and peer-to-peer reference drift.
+- Finance/import tests: 65 passed (added 11).
+- Vite production build: passed.
+- Live verification in user's Chrome tab: opened Ledger (134 saved transactions), clicked Find duplicates, panel rendered with the correct empty state "No duplicate clusters found across your saved transactions" — the user has never duplicate-uploaded, so empty is correct. Close button returns to the regular table view.

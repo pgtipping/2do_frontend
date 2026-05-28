@@ -355,6 +355,39 @@ export function createFinanceRepository({
     };
   };
 
+  const deleteTransactions = async (transactionIds = []) => {
+    if (transactionIds.length === 0) {
+      return {
+        status: "noop",
+        deletedCount: 0,
+      };
+    }
+
+    const data = await loadData();
+    const originalLength = data.transactions.length;
+    const removalSet = new Set(transactionIds);
+
+    data.transactions = data.transactions.filter(
+      (transaction) => !removalSet.has(transaction.id)
+    );
+
+    const deletedCount = originalLength - data.transactions.length;
+
+    if (deletedCount === 0) {
+      return {
+        status: "missing",
+        deletedCount: 0,
+      };
+    }
+
+    await saveData(data);
+
+    return {
+      status: "deleted",
+      deletedCount,
+    };
+  };
+
   const updateSubscription = async (subscriptionId, updates) => {
     const data = await loadData();
     const subscriptionIndex = data.subscriptions.findIndex(
@@ -467,6 +500,7 @@ export function createFinanceRepository({
     findSimilarTransactions,
     applyTransactionCategoryChange,
     deleteTransaction,
+    deleteTransactions,
     saveReviewedImport,
   };
 }

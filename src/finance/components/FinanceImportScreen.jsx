@@ -25,6 +25,10 @@ import {
   getUpcomingSubscriptions,
 } from "../reports";
 import { createJsonBackup, exportTransactionsCsv } from "../backup";
+import {
+  findSuspectedDuplicateClusters,
+  getRemovalIdsForClusters,
+} from "../duplicateDetection";
 import "./FinanceImportScreen.css";
 
 const SAMPLE_STATEMENT_TEXT = `Page: 1 of 6
@@ -131,6 +135,7 @@ export default function FinanceImportScreen() {
   );
   const [confirmingSubscriptionDeleteId, setConfirmingSubscriptionDeleteId] =
     useState(null);
+  const [duplicateReview, setDuplicateReview] = useState(null);
   const defaultCategories = useMemo(() => createDefaultCategories(), []);
   const repository = useMemo(() => createFinanceRepository(), []);
   const categories = mergeCategoriesWithDefaults(
@@ -398,6 +403,74 @@ export default function FinanceImportScreen() {
 
     await repository.deleteTransaction(transactionId);
     setConfirmingDeleteId(null);
+    await loadFinanceData();
+  };
+
+  const openDuplicateReview = () => {
+    const clusters = findSuspectedDuplicateClusters(transactions);
+    // Pre-select every row past the first in each cluster — the typical
+    // case is "keep the first, drop the rest". The user can flip any
+    // checkbox before confirming.
+    const removedIdsByCluster = new Map();
+
+    clusters.forEach((cluster) => {
+      const removalSet = new Set();
+
+      cluster.transactions.slice(1).forEach((transaction) => {
+        removalSet.add(transaction.id);
+      });
+
+      removedIdsByCluster.set(cluster.key, removalSet);
+    });
+
+    setDuplicateReview({ clusters, removedIdsByCluster });
+  };
+
+  const closeDuplicateReview = () => {
+    setDuplicateReview(null);
+  };
+
+  const toggleDuplicateRemoval = (clusterKey, transactionId) => {
+    setDuplicateReview((currentReview) => {
+      if (!currentReview) {
+        return currentReview;
+      }
+
+      const nextRemoved = new Map(currentReview.removedIdsByCluster);
+      const removalSet = new Set(nextRemoved.get(clusterKey) || []);
+
+      if (removalSet.has(transactionId)) {
+        removalSet.delete(transactionId);
+      } else {
+        removalSet.add(transactionId);
+      }
+
+      nextRemoved.set(clusterKey, removalSet);
+
+      return {
+        ...currentReview,
+        removedIdsByCluster: nextRemoved,
+      };
+    });
+  };
+
+  const confirmDuplicateRemoval = async () => {
+    if (!duplicateReview) {
+      return;
+    }
+
+    const removalIds = getRemovalIdsForClusters(
+      duplicateReview.clusters,
+      duplicateReview.removedIdsByCluster
+    );
+
+    if (removalIds.length === 0) {
+      closeDuplicateReview();
+      return;
+    }
+
+    await repository.deleteTransactions(removalIds);
+    closeDuplicateReview();
     await loadFinanceData();
   };
 
@@ -902,23 +975,123 @@ export default function FinanceImportScreen() {
                   : `${selectedMonth} transactions`}
               </h2>
             </div>
-            <select
-              className="month-select"
-              aria-label="Select ledger month"
-              value={selectedMonth}
-              onChange={(event) => setSelectedMonth(event.target.value)}
-            >
-              <option value={ALL_MONTHS}>All months</option>
-              {[selectedMonth, ...monthOptions]
-                .filter((month) => month && month !== ALL_MONTHS)
-                .filter((month, index, months) => months.indexOf(month) === index)
-                .map((month) => (
-                  <option key={month} value={month}>
-                    {month}
-                  </option>
-                ))}
-            </select>
+            <div className="ledger-heading-actions">
+              <button
+                type="button"
+                className="ghost-action compact"
+                onClick={openDuplicateReview}
+                disabled={transactions.length < 2}
+              >
+                Find duplicates
+              </button>
+              <select
+                className="month-select"
+                aria-label="Select ledger month"
+                value={selectedMonth}
+                onChange={(event) => setSelectedMonth(event.target.value)}
+              >
+                <option value={ALL_MONTHS}>All months</option>
+                {[selectedMonth, ...monthOptions]
+                  .filter((month) => month && month !== ALL_MONTHS)
+                  .filter((month, index, months) => months.indexOf(month) === index)
+                  .map((month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
+
+          {duplicateReview ? (
+            <div className="duplicate-review-panel">
+              <div className="duplicate-review-heading">
+                <div>
+                  <h3>Suspected duplicates</h3>
+                  <p>
+                    {duplicateReview.clusters.length === 0
+                      ? "No duplicate clusters found across your saved transactions."
+                      : "Each group shares the same date, amount, and merchant. Uncheck any row you want to keep, then confirm."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ghost-action compact"
+                  onClick={closeDuplicateReview}
+                >
+                  Close
+                </button>
+              </div>
+
+              {duplicateReview.clusters.length > 0 ? (
+                <>
+                  <div className="duplicate-cluster-list">
+                    {duplicateReview.clusters.map((cluster) => {
+                      const removalSet =
+                        duplicateReview.removedIdsByCluster.get(cluster.key) ||
+                        new Set();
+
+                      return (
+                        <div key={cluster.key} className="duplicate-cluster">
+                          <p className="duplicate-cluster-summary">
+                            {cluster.transactions[0].date} ·{" "}
+                            {formatMoney(cluster.transactions[0].amount)} ·{" "}
+                            {cluster.transactions.length} matching rows
+                          </p>
+                          <ul>
+                            {cluster.transactions.map((transaction) => {
+                              const isMarkedForRemoval = removalSet.has(
+                                transaction.id
+                              );
+
+                              return (
+                                <li
+                                  key={transaction.id}
+                                  className={
+                                    isMarkedForRemoval ? "marked-for-removal" : ""
+                                  }
+                                >
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={isMarkedForRemoval}
+                                      onChange={() =>
+                                        toggleDuplicateRemoval(
+                                          cluster.key,
+                                          transaction.id
+                                        )
+                                      }
+                                    />
+                                    <span className="duplicate-row-description">
+                                      {transaction.description ||
+                                        transaction.rawNarration}
+                                    </span>
+                                    <span className="duplicate-row-meta">
+                                      {categoryById.get(transaction.categoryId)
+                                        ?.name || "Uncategorized"}
+                                    </span>
+                                  </label>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="duplicate-review-actions">
+                    <button
+                      type="button"
+                      className="primary-action compact"
+                      onClick={confirmDuplicateRemoval}
+                    >
+                      Remove selected
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
 
           {monthTransactions.length > 0 ? (
             <div className="transaction-table">

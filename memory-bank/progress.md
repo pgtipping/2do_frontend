@@ -344,3 +344,20 @@ Verification:
 - Vite production build: passed.
 - `git diff --check`: passed.
 - Direct HTTP check confirmed port `5189` serves the new built JavaScript and CSS files.
+
+
+## 2026-05-28 17:30:00 - Ledger duplicate finder shipped
+
+Added a Ledger-side duplicate finder to catch duplicate transactions the save-time fingerprint guard missed.
+
+- New module `src/finance/duplicateDetection.js` groups transactions by date + absolute amount + normalized merchant text and returns clusters with 2+ members, sorted most-recent first.
+- The normalizer used by clustering is the same one used by `categoryRules`, so per-transaction noise (AUT auth codes, peer-to-peer reference tokens, 6-digit numbers, month words) is stripped before matching. This is exactly what lets the tool catch duplicates that drifted past the exact-fingerprint guard.
+- Added `deleteTransactions(ids)` bulk delete to `localFinanceStore.js`.
+- Added a `Find duplicates` button to the Ledger heading and a review panel that opens above the transaction table. Each cluster shows date, amount, and member count; every row past the first is pre-selected for removal; user can flip any checkbox before confirming.
+- Added 11 new tests in `src/finance/__tests__/duplicateDetection.test.mjs` covering exact duplicates, narration-drift duplicates, different-merchant non-grouping, different-amount non-grouping, different-date non-grouping, intentional same-merchant-same-day grouping (user dismisses), sort order, blank narration skipping, removal-id flattening, opposite-sign transfer grouping, and peer-to-peer reference drift.
+
+Verification:
+
+- Finance/import tests: 65 passed (54 prior + 11 new).
+- Vite production build: passed.
+- Live verification in user's Chrome tab against 134 saved transactions: button shows up, panel opens, empty-state copy reads "No duplicate clusters found across your saved transactions", close returns to the table view. The user has never duplicate-uploaded, so empty is the correct result.
