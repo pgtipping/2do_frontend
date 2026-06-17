@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-06-01 21:12:00 - Supabase migration verified + Clear-button fix
+
+- User created the Supabase project, ran the `finance_state` RLS migration, and logged in via magic link.
+- Restore confirmed: all 134 transactions are in Supabase (Ledger shows "134 saved transactions"; Income $3,756.40, Spending $7,505.07). Verified live in Chrome while signed in (real Supabase session token present).
+- Confirmed data is cloud-sourced, not local: the app reads only the Supabase driver, so the same data appears on any port after login.
+- Fixed a UI regression from this work: the new Restore JSON button overflowed the statement panel's button row and clipped "Clear". Added `flex-wrap` to `.source-actions` and `.panel-heading`; verified Parse / Upload PDF / Restore JSON / Clear now render without clipping.
+- Temporary `:5191` dev server (recovery/verification) stopped; canonical server is `:5173`.
+
+## 2026-06-01 21:04:53 - Supabase cloud storage + magic-link auth (code complete)
+
+- Added a Supabase browser client, a Supabase storage driver (one JSONB row per user, same load/save contract as the IndexedDB driver), and a unit test with a mocked client.
+- Added a magic-link login gate (AuthGate + useSupabaseAuth) wrapping the app, plus a Sign out control.
+- Switched FinanceImportScreen to the Supabase driver; added a Restore JSON button and a load-error banner.
+- Added the `finance_state` table + RLS migration (run by the user; confirmed created).
+- Wired `npm test` to run both the legacy node:test `.mjs` suites (65 tests) and the new vitest `.js` suite (5 tests); both green. Production build green.
+- Verified the login gate renders live in Chrome (no console errors).
+- Recovered the stranded `localhost:5191` data (134 transactions) to `~/Downloads/recovered-from-5191.json` for restore into Supabase.
+
 ## 2026-05-25 18:06:50 - Finance foundation shipped
 
 Completed before memory bank creation:

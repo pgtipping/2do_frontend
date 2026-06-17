@@ -1,5 +1,21 @@
 # Next Steps
 
+## 2026-06-01 21:04:53 - Finish Supabase cutover
+
+Done this session: Supabase storage driver, magic-link login gate, Sign out, and the JSON restore button (the previously-pending "JSON restore import" item is now built). Build + both test suites green; login gate verified live in Chrome.
+
+Immediate (user actions):
+1. Log in via magic link on the dev server.
+2. Click Restore JSON and select `~/Downloads/recovered-from-5191.json` to load the recovered 134 transactions into Supabase.
+3. Disable new sign-ups in Supabase Auth (owner-only access).
+
+Then:
+4. Commit and push the Supabase migration once the user gives the signal (nothing committed yet).
+5. Optional: remove the now-unused IndexedDB driver, or keep it as an offline fallback (decide later).
+6. Prior backlog still open: multi-PDF upload; README refresh; Ledger search/filter.
+
+Note: the earlier "do not add authentication or bank sync UI yet" reminder is superseded by the user's explicit move to Supabase + login.
+
 ## 2026-05-28 17:30:00 - Active resumption path
 
 Recommended next step: ask the user whether to commit and push the duplicate finder, then resume work on multi-PDF upload or JSON restore.

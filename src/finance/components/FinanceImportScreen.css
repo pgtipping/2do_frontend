@@ -133,7 +133,9 @@
 .source-actions {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .file-action {
@@ -191,6 +193,7 @@
 .panel-heading {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   justify-content: space-between;
   margin-bottom: 16px;

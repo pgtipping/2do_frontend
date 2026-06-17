@@ -1,5 +1,15 @@
 # Decisions
 
+## 2026-06-01 21:04:53 - Storage reversed to Supabase cloud + auth (supersedes 2026-05-25 local-first)
+
+At the user's explicit request, storage moves from local-first IndexedDB to Supabase (hosted Postgres) behind a login. This supersedes the 2026-05-25 "local-first, no authentication/multi-device sync" decision below.
+
+- Provider: Supabase, not Vercel Postgres. This is a browser-only Vite SPA with no backend; Supabase ships a browser-safe client (publishable key + Row-Level Security), while Vercel Postgres needs a server layer the app does not have.
+- Storage shape: one JSONB bundle per user (table `finance_state`), mirroring the existing single-record IndexedDB driver, so all repository logic is reused via the existing driver seam. Normalized per-entity tables deferred until actually needed.
+- Auth: magic-link (passwordless), single owner; new sign-ups to be disabled after first login. RLS restricts each row to its owner.
+- Only the publishable key is in the frontend; the secret key is never used client-side.
+- Offline support dropped for now (cloud requires network + login); a local cache could be added later if needed.
+
 ## 2026-05-25 18:06:50 - Product direction
 
 The app is being repurposed from a todo app into a personal finance app.

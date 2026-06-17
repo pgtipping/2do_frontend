@@ -8,6 +8,7 @@ import {
   FaExclamationTriangle,
   FaFileImport,
   FaListUl,
+  FaSignOutAlt,
   FaTags,
   FaTrash,
 } from "react-icons/fa";
@@ -15,6 +16,8 @@ import { mergeCategoriesWithDefaults } from "../categories";
 import { createDefaultCategories } from "../defaultCategories";
 import { createCategory, createSubscription } from "../domain";
 import { createFinanceRepository } from "../storage/localFinanceStore";
+import { createSupabaseStorageDriver } from "../storage/supabaseFinanceDriver";
+import { supabase } from "../storage/supabaseClient";
 import { extractTextFromPdfFile } from "../imports/pdfTextExtractor";
 import { parseTdBankStatementText } from "../imports/tdBankStatementParser";
 import { createReviewedImportDraft } from "../imports/reviewedImportDraft";
@@ -24,7 +27,11 @@ import {
   calculateMonthlySummary,
   getUpcomingSubscriptions,
 } from "../reports";
-import { createJsonBackup, exportTransactionsCsv } from "../backup";
+import {
+  createJsonBackup,
+  exportTransactionsCsv,
+  restoreJsonBackup,
+} from "../backup";
 import {
   findSuspectedDuplicateClusters,
   getRemovalIdsForClusters,
@@ -119,6 +126,7 @@ export default function FinanceImportScreen() {
   const [pdfStatus, setPdfStatus] = useState("");
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [financeData, setFinanceData] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(ALL_MONTHS);
   const [includeSelfTransfers, setIncludeSelfTransfers] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState(null);
@@ -149,23 +157,32 @@ export default function FinanceImportScreen() {
   const categoryRules = financeData?.categoryRules || [];
 
   const loadFinanceData = async () => {
-    const data = await repository.loadData();
-    const hydratedData = {
-      ...data,
-      categories: mergeCategoriesWithDefaults(defaultCategories, data.categories),
-    };
-    const months = Array.from(
-      new Set(hydratedData.transactions.map((transaction) => getMonthKey(transaction.date)))
-    ).sort();
+    try {
+      const data = await repository.loadData();
+      const hydratedData = {
+        ...data,
+        categories: mergeCategoriesWithDefaults(defaultCategories, data.categories),
+      };
+      const months = Array.from(
+        new Set(hydratedData.transactions.map((transaction) => getMonthKey(transaction.date)))
+      ).sort();
 
-    setFinanceData(hydratedData);
+      setFinanceData(hydratedData);
+      setLoadError("");
 
-    if (
-      selectedMonth !== ALL_MONTHS &&
-      months.length > 0 &&
-      !months.includes(selectedMonth)
-    ) {
-      setSelectedMonth(ALL_MONTHS);
+      if (
+        selectedMonth !== ALL_MONTHS &&
+        months.length > 0 &&
+        !months.includes(selectedMonth)
+      ) {
+        setSelectedMonth(ALL_MONTHS);
+      }
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Could not load your finance data."
+      );
     }
   };
 
@@ -684,6 +701,36 @@ export default function FinanceImportScreen() {
     );
   };
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const restoreFromBackup = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setErrorMessage("");
+
+    try {
+      const parsedBackup = JSON.parse(await file.text());
+      const restoredData = restoreJsonBackup(parsedBackup);
+
+      await repository.saveData(restoredData);
+      await loadFinanceData();
+      setSaveResult(null);
+      setPdfStatus(`Restored your data from ${file.name}.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Backup could not be restored."
+      );
+    } finally {
+      event.target.value = "";
+    }
+  };
+
   const readyCount = draft?.rows.filter((row) => row.status === "ready").length || 0;
   const reviewCount =
     draft?.rows.filter((row) => row.status === "needs_review").length || 0;
@@ -744,8 +791,18 @@ export default function FinanceImportScreen() {
             <FaDownload aria-hidden="true" />
             Backup JSON
           </button>
+          <button className="ghost-action" type="button" onClick={signOut}>
+            <FaSignOutAlt aria-hidden="true" />
+            Sign out
+          </button>
         </div>
       </section>
+
+      {loadError ? (
+        <p className="error-message data-error" role="alert">
+          {loadError}
+        </p>
+      ) : null}
 
       <nav className="workspace-tabs" aria-label="Finance workspace sections">
         <button
@@ -811,6 +868,15 @@ export default function FinanceImportScreen() {
                   onChange={importPdf}
                 />
                 Upload PDF
+              </label>
+              <label className="file-action">
+                <input
+                  accept="application/json"
+                  aria-label="Restore from a backup JSON file"
+                  type="file"
+                  onChange={restoreFromBackup}
+                />
+                Restore JSON
               </label>
               <button
                 className="ghost-action"

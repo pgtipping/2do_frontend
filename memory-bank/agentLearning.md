@@ -1,5 +1,11 @@
 # Agent Learning
 
+## 2026-06-01 21:04:53 - Dual test runners + install constraints + IndexedDB origin scoping
+
+- Tests use TWO runners. Legacy suites are `.mjs` using Node's built-in `node:test` (run via `node --test "src/**/*.test.mjs"`); newer suites are `.js`/`.jsx` using vitest. `npm test` runs both; `npm run test:node` and `npm run test:unit` run them separately. vitest's `include` is scoped to `.test.{js,jsx}` so it does not choke on the node:test `.mjs` files ("No test suite found").
+- `npm install` fails with ERESOLVE from a pre-existing peer conflict (`react-speech-kit` wants React 16; project is React 18). Always install with `--legacy-peer-deps`.
+- IndexedDB is origin-scoped (scheme + host + port). Because the Vite dev port varies, data saved on one port is invisible on another. To read a stranded origin's IndexedDB, serve any page on that exact port (`vite --port N --strictPort`) and read `indexedDB.open('personal_finance_app')` directly in the page — the data persists regardless of what the current app code does.
+
 ## 2026-05-25 18:06:50 - Windows local tooling pattern
 
 On this machine, `npm` may not be available in PowerShell, and some Node launchers can be blocked.

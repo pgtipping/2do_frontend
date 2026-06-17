@@ -1,5 +1,28 @@
 # Active Context
 
+## 2026-06-01 21:12:00 - Supabase migration verified end-to-end (status update)
+
+Login + restore are done: 134 transactions are in Supabase and render in the Ledger (verified live in Chrome while signed in — Ledger shows "134 saved transactions", Income $3,756.40 / Spending $7,505.07). Confirmed cloud-sourced (real Supabase session token for project `eduwsqutcbilieammkdy`; the app reads only the Supabase driver, so the same data shows on any port after login). Fixed a UI regression: the new Restore JSON button overflowed the statement panel and clipped "Clear" — added `flex-wrap` to `.source-actions` and `.panel-heading`. Temporary `:5191` server stopped; canonical dev server is `:5173`. Remaining: disable new sign-ups in Supabase Auth; commit/push when the user signals.
+
+## 2026-06-01 21:04:53 - Storage moving to Supabase (cloud) with magic-link login
+
+The finance app's storage is moving off browser-only IndexedDB onto Supabase (hosted Postgres), behind a login, so data follows the user across devices and dev ports. This reverses the original local-first decision, at the user's explicit request.
+
+Why: IndexedDB is scoped to one exact origin (host + port). The Vite dev port changes between sessions, so 134 saved transactions got stranded under `localhost:5191` and were invisible at `localhost:5173`. Cloud storage removes the port/device dependency.
+
+Shipped this session (code complete; build + both test suites green; login gate verified live in Chrome with no console errors):
+
+- `src/finance/storage/supabaseClient.js` — browser client from VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY (throws if missing).
+- `src/finance/storage/supabaseFinanceDriver.js` — new storage driver, same `load`/`save` contract as the IndexedDB driver, storing the whole bundle as one JSONB row per user in table `finance_state`; unit-tested with a mocked client.
+- `src/finance/auth/AuthGate.jsx` + `useSupabaseAuth.js` — magic-link (passwordless) login gate wrapping the app; Sign out added to the hero.
+- `FinanceImportScreen.jsx` — now uses the Supabase driver; added a "Restore JSON" button (uses existing `restoreJsonBackup`); load errors surfaced via a banner.
+- `supabase/migrations/0001_create_finance_state.sql` — table + RLS policies (run by the user; confirmed created).
+- `.env.example` updated with the two Supabase vars; `vite.config.js` + `package.json` wired for the test runners.
+
+Recovery: the stranded `localhost:5191` IndexedDB (134 transactions, 10 categories, 85 category rules, 2 import batches) was read directly from that origin and exported to `~/Downloads/recovered-from-5191.json` (168 KB).
+
+Pending (user actions): log in via magic link; click Restore JSON and pick `recovered-from-5191.json`; then disable new sign-ups in Supabase Auth (owner-only). Nothing committed or pushed yet (awaiting user signal). Design spec: `docs/superpowers/specs/2026-06-01-supabase-finance-storage-design.md`.
+
 ## 2026-05-25 18:06:50 - Current project state
 
 The repository is cloned locally at `C:\Users\pgeor\Documents\WebDev\Personal Finance App` and tracks `pgtipping/2do_frontend` on `main`.
