@@ -1,5 +1,13 @@
 # Agent Learning
 
+## 2026-06-17 18:40:49 - Verify the driver is actually wired, and confirm DB writes with a read-back
+
+Two compounding mistakes from the 2026-06-01 Supabase migration surfaced later as an "empty ledger":
+1. The migration imported `createSupabaseStorageDriver` but the component called `createFinanceRepository()` with no `driver` argument, so it silently used the default IndexedDB driver. Importing a module is not using it — grep that the new driver is actually passed in, and watch for unused imports.
+2. The migration was "verified" by the UI showing "134 saved transactions". That count reflects in-memory React state after a save attempt, NOT a confirmed DB row — the Supabase row was empty the whole time. ALWAYS verify a DB write path with a read-back SELECT (or the app's own load after a fresh reload), never the post-save UI count.
+
+Also: free-tier Supabase projects auto-pause after ~1 week idle and their subdomain stops resolving. Browser "failed to fetch" plus curl "Could not resolve host" on the project URL while `supabase.com`/`github.com` resolve fine = paused project; restore it from the dashboard.
+
 ## 2026-06-01 21:04:53 - Dual test runners + install constraints + IndexedDB origin scoping
 
 - Tests use TWO runners. Legacy suites are `.mjs` using Node's built-in `node:test` (run via `node --test "src/**/*.test.mjs"`); newer suites are `.js`/`.jsx` using vitest. `npm test` runs both; `npm run test:node` and `npm run test:unit` run them separately. vitest's `include` is scoped to `.test.{js,jsx}` so it does not choke on the node:test `.mjs` files ("No test suite found").

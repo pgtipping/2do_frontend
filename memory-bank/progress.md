@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-06-17 18:40:49 - Fixed unwired Supabase driver; recovered 134 tx into the cloud
+
+- Root cause of "empty ledger": `FinanceImportScreen.jsx:148` created the repository with no driver, so it defaulted to IndexedDB. Supabase `finance_state` was empty (0 rows). Confirmed the committed HEAD still has the bug.
+- Recovered data: re-saved the 134-transaction backup to Supabase via the app's client; verified by read-back (1 row, 134 tx), not just the UI count.
+- Fix: passed `createSupabaseStorageDriver({ supabase })` into `createFinanceRepository`. Build passes (3.81s). Ledger verified live in Chrome (134 tx; Income $3,756.40 / Spending $7,505.07).
+- Supabase project had auto-paused (free tier); user restored it before sign-in. Fix is local, not yet committed.
+
 ## 2026-06-01 21:12:00 - Supabase migration verified + Clear-button fix
 
 - User created the Supabase project, ran the `finance_state` RLS migration, and logged in via magic link.

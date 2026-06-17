@@ -1,5 +1,19 @@
 # Active Context
 
+## 2026-06-17 18:40:49 - Critical fix: Supabase driver was never wired into the UI (data lived in IndexedDB)
+
+The 2026-06-01 migration shipped a half-wired bug. `FinanceImportScreen.jsx:148` called `createFinanceRepository()` with NO driver, so it used the default IndexedDB driver — not Supabase. Auth went through Supabase, but all finance data still read/wrote browser-local IndexedDB (the exact origin-stranding problem the migration was meant to fix). The prior "verified cloud-sourced on :5191" claim below was wrong: it was reading IndexedDB on that origin, and `finance_state` in Supabase was empty (0 rows) the whole time.
+
+Diagnosis this session (signed in as pgtipping1@gmail.com, user `62e945a1-4e6a-4899-bb2c-3f5d65bbb40c`): the app's own data request returned 0 rows; root cause found at `FinanceImportScreen.jsx:148`.
+
+Recovery + fix:
+- Re-imported the last backup (`Downloads/recovered-from-5191.json`, 134 tx) into Supabase via the app's own client (upsert -> 201; read-back 200 confirms 1 row / 134 tx). Persistence verified by read-back, not the UI count.
+- Wired the Supabase driver: `createFinanceRepository({ driver: createSupabaseStorageDriver({ supabase }) })` at `FinanceImportScreen.jsx:148`.
+- Verified live in Chrome on :5173: Ledger shows 134 saved transactions, Income $3,756.40 / Spending $7,505.07, loading from Supabase. Build green (3.81s).
+- The Supabase project had auto-paused (free tier; subdomain stopped resolving); user restored it before sign-in.
+
+NOT yet committed (fix is local on `main`). Push only on user signal. Still open: disable new sign-ups in Supabase Auth.
+
 ## 2026-06-01 21:12:00 - Supabase migration verified end-to-end (status update)
 
 Login + restore are done: 134 transactions are in Supabase and render in the Ledger (verified live in Chrome while signed in — Ledger shows "134 saved transactions", Income $3,756.40 / Spending $7,505.07). Confirmed cloud-sourced (real Supabase session token for project `eduwsqutcbilieammkdy`; the app reads only the Supabase driver, so the same data shows on any port after login). Fixed a UI regression: the new Restore JSON button overflowed the statement panel and clipped "Clear" — added `flex-wrap` to `.source-actions` and `.panel-heading`. Temporary `:5191` server stopped; canonical dev server is `:5173`. Remaining: disable new sign-ups in Supabase Auth; commit/push when the user signals.

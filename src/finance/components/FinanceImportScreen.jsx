@@ -145,7 +145,10 @@ export default function FinanceImportScreen() {
     useState(null);
   const [duplicateReview, setDuplicateReview] = useState(null);
   const defaultCategories = useMemo(() => createDefaultCategories(), []);
-  const repository = useMemo(() => createFinanceRepository(), []);
+  const repository = useMemo(
+    () => createFinanceRepository({ driver: createSupabaseStorageDriver({ supabase }) }),
+    []
+  );
   const categories = mergeCategoriesWithDefaults(
     defaultCategories,
     financeData?.categories || []
