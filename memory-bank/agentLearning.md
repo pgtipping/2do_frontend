@@ -1,5 +1,11 @@
 # Agent Learning
 
+## 2026-06-19 02:00:26 - The ERESOLVE conflict was dead code; deleting it beat working around it
+
+The repo's `npm install` ERESOLVE failure (documented in the 2026-06-01 entry as "always use --legacy-peer-deps") was caused by `react-speech-kit@3` (peer: React 16) — a leftover from the original todo app that the finance app never imported. The durable fix was deleting the dead todo code and its 21 unused deps; afterward `npm install` resolves cleanly with no flag and no `.npmrc`. So the earlier "always use --legacy-peer-deps" advice is now obsolete. Before reaching for a `legacy-peer-deps` workaround, check whether the conflicting package is even used — a dead dep is better deleted than worked around.
+
+What made the deletion safe: confirmed `src/finance/` imported nothing from the todo dirs (grep for cross-dir imports), and mapped every dependency's import sites across `src/` before removing. Caveat: `pdfjs-dist` looked unused to a naive grep because it loads via dynamic `import("pdfjs-dist/build/pdf.min.js")` — always verify dynamic/subpath imports before deleting a "0 matches" dependency.
+
 ## 2026-06-17 18:40:49 - Verify the driver is actually wired, and confirm DB writes with a read-back
 
 Two compounding mistakes from the 2026-06-01 Supabase migration surfaced later as an "empty ledger":

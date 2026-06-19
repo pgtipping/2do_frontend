@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-06-19 02:00:26 - Stripped the dead todo app; runtime deps down to 5
+
+- Deleted all todo code (`src/components`, `src/contexts`, `src/utils`, `src/App.css` = 45 files); renamed package to `personal-finance-app`. `src/finance` was already self-contained, so nothing broke.
+- Removed 21 unused deps; `npm install` removed 175 packages and resolved with no peer-dep flag. Dropped the `.npmrc` legacy-peer-deps workaround — no longer needed once `react-speech-kit` (the conflict source) was gone.
+- Verified: build green (18.63s), 70/70 tests, app loads clean signed-in in Chrome. Committed locally (not pushed). Prep for the Vercel deploy.
+
 ## 2026-06-17 18:40:49 - Fixed unwired Supabase driver; recovered 134 tx into the cloud
 
 - Root cause of "empty ledger": `FinanceImportScreen.jsx:148` created the repository with no driver, so it defaulted to IndexedDB. Supabase `finance_state` was empty (0 rows). Confirmed the committed HEAD still has the bug.

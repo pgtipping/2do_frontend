@@ -1,5 +1,17 @@
 # Active Context
 
+## 2026-06-19 02:00:26 - Removed the dead 2do (todo) app; repo is now finance-only
+
+The repo was the original `2do` todo app with the finance app built on top; the todo code was never removed. Deleted it all: `src/components/` (17 todo components), `src/contexts/NotificationContext.jsx`, `src/utils/` (9 todo helpers), `src/App.css` (45 files total). Renamed the package `react-todo-app` -> `personal-finance-app`. `src/finance/` was already self-contained (imports nothing from the deleted dirs), so nothing broke.
+
+Removed 21 unused todo-only dependencies: 9 `@tiptap/*`, `lowlight`, `react-speech-kit`, `react-speech-recognition`, `pusher-js`, `socket.io-client`, `framer-motion`, `openai`, `react-markdown`, `date-fns`, `uuid`, `@fortawesome/fontawesome-free`. Kept: react, react-dom, @supabase/supabase-js, pdfjs-dist, react-icons. `npm install` removed 175 packages and resolved cleanly.
+
+Key win: `react-speech-kit` (React 16 peer) was the ERESOLVE cause. With it gone, `npm install` needs NO `--legacy-peer-deps` and NO `.npmrc` — both removed. Vercel will build with default settings. (`npm audit` still reports 9 vulns in remaining transitive deps (pdfjs-dist/vite) — not addressed.)
+
+Verified: build green (18.63s, 103 modules), 70/70 tests pass, app loads signed-in in Chrome with no console errors. Committed locally; needs a push before the Vercel deploy.
+
+Vercel deploy in progress (GitHub auto-deploy chosen): import page reached, framework auto-detected as Vite. Next: push cleanup -> add 2 env vars (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY) on the Vercel form -> Deploy -> add the Vercel URL to Supabase Auth URL Configuration (Site URL + Redirect URLs) or magic-link login breaks on the live site.
+
 ## 2026-06-17 18:40:49 - Critical fix: Supabase driver was never wired into the UI (data lived in IndexedDB)
 
 The 2026-06-01 migration shipped a half-wired bug. `FinanceImportScreen.jsx:148` called `createFinanceRepository()` with NO driver, so it used the default IndexedDB driver — not Supabase. Auth went through Supabase, but all finance data still read/wrote browser-local IndexedDB (the exact origin-stranding problem the migration was meant to fix). The prior "verified cloud-sourced on :5191" claim below was wrong: it was reading IndexedDB on that origin, and `finance_state` in Supabase was empty (0 rows) the whole time.

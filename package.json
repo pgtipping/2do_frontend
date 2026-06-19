@@ -1,5 +1,5 @@
 {
-  "name": "react-todo-app",
+  "name": "personal-finance-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,31 +12,11 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^6.4.0",
     "@supabase/supabase-js": "^2.106.2",
-    "@tiptap/extension-code-block-lowlight": "^2.11.0",
-    "@tiptap/extension-heading": "^2.11.0",
-    "@tiptap/extension-image": "^2.11.0",
-    "@tiptap/extension-link": "^2.11.0",
-    "@tiptap/extension-placeholder": "^2.11.0",
-    "@tiptap/extension-task-item": "^2.11.0",
-    "@tiptap/extension-task-list": "^2.11.0",
-    "@tiptap/react": "^2.11.0",
-    "@tiptap/starter-kit": "^2.11.0",
-    "date-fns": "^2.30.0",
-    "framer-motion": "^10.12.16",
-    "lowlight": "^2.9.0",
-    "openai": "^4.20.1",
     "pdfjs-dist": "3.11.174",
-    "pusher-js": "^8.4.0-rc2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-icons": "^5.4.0",
-    "react-markdown": "^8.0.7",
-    "react-speech-kit": "^3.0.1",
-    "react-speech-recognition": "^3.10.0",
-    "socket.io-client": "^4.7.2",
-    "uuid": "^11.0.3"
+    "react-icons": "^5.4.0"
   },
   "devDependencies": {
     "@types/react": "^18.0.28",
