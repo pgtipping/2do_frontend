@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-06-20 02:26:01 - Import Review blocks uncategorized rows from the ledger
+
+- Uncategorized rows are now highlighted (amber bar + tag + an "Uncategorized: N" metric) and cannot be saved: their checkbox is disabled, parse default-selects only categorized rows, and assigning/clearing a category syncs the selection.
+- Guarantee lives at the storage chokepoint: `saveReviewedImport` (`localFinanceStore.js:444`) filters out any row with no `categoryId` before writing — covers both IndexedDB and Supabase backends. `rowCount` now reflects categorized rows imported.
+- Added a safety-net unit test; updated one pre-existing duplicate-count test that incidentally saved uncategorized fixtures (gave it a category). Verified: 49 node + 5 vitest pass, build green (7.94s).
+- Live-verified in Chrome (synthetic sample, not saved): 3 uncategorized rows highlighted amber + locked, assigning a category unlocked + auto-selected the row. Local on `main`, not committed/pushed.
+
 ## 2026-06-19 02:00:26 - Stripped the dead todo app; runtime deps down to 5
 
 - Deleted all todo code (`src/components`, `src/contexts`, `src/utils`, `src/App.css` = 45 files); renamed package to `personal-finance-app`. `src/finance` was already self-contained, so nothing broke.

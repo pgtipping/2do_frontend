@@ -117,6 +117,10 @@ function downloadTextFile(fileName, text, type) {
   URL.revokeObjectURL(url);
 }
 
+function isReviewRowCategorized(row) {
+  return Boolean(row?.transaction?.categoryId);
+}
+
 export default function FinanceImportScreen() {
   const [activeTab, setActiveTab] = useState("import");
   const [statementText, setStatementText] = useState(SAMPLE_STATEMENT_TEXT);
@@ -209,7 +213,13 @@ export default function FinanceImportScreen() {
         createId: createStableId,
       });
       setDraft(nextDraft);
-      setSelectedRows(new Set(nextDraft.rows.map((row) => row.id)));
+      setSelectedRows(
+        new Set(
+          nextDraft.rows
+            .filter((row) => isReviewRowCategorized(row))
+            .map((row) => row.id)
+        )
+      );
     } catch (error) {
       setDraft(null);
       setSelectedRows(new Set());
@@ -248,7 +258,13 @@ export default function FinanceImportScreen() {
 
       if (nextRows.has(rowId)) {
         nextRows.delete(rowId);
-      } else {
+        return nextRows;
+      }
+
+      // Uncategorized rows can never be selected — they are blocked from import.
+      const targetRow = draft?.rows.find((row) => row.id === rowId);
+
+      if (targetRow && isReviewRowCategorized(targetRow)) {
         nextRows.add(rowId);
       }
 
@@ -257,6 +273,8 @@ export default function FinanceImportScreen() {
   };
 
   const updateRowCategory = (rowId, categoryId) => {
+    const nextCategoryId = categoryId || null;
+
     setDraft((currentDraft) => ({
       ...currentDraft,
       rows: currentDraft.rows.map((row) =>
@@ -265,12 +283,26 @@ export default function FinanceImportScreen() {
               ...row,
               transaction: {
                 ...row.transaction,
-                categoryId: categoryId || null,
+                categoryId: nextCategoryId,
               },
             }
           : row
       ),
     }));
+
+    // Keep selection in sync: assigning a category includes the row; clearing
+    // it back to "Uncategorized" removes it so it cannot reach the ledger.
+    setSelectedRows((currentRows) => {
+      const nextRows = new Set(currentRows);
+
+      if (nextCategoryId) {
+        nextRows.add(rowId);
+      } else {
+        nextRows.delete(rowId);
+      }
+
+      return nextRows;
+    });
   };
 
   const createInlineCategory = async () => {
@@ -737,6 +769,8 @@ export default function FinanceImportScreen() {
   const readyCount = draft?.rows.filter((row) => row.status === "ready").length || 0;
   const reviewCount =
     draft?.rows.filter((row) => row.status === "needs_review").length || 0;
+  const uncategorizedCount =
+    draft?.rows.filter((row) => !isReviewRowCategorized(row)).length || 0;
   const selectedCount = selectedRows.size;
   const monthOptions = Array.from(
     new Set(transactions.map((transaction) => getMonthKey(transaction.date)))
@@ -934,6 +968,10 @@ export default function FinanceImportScreen() {
               <span>{reviewCount}</span>
               Review
             </div>
+            <div className={uncategorizedCount > 0 ? "metric-uncategorized" : undefined}>
+              <span>{uncategorizedCount}</span>
+              Uncategorized
+            </div>
             <div>
               <span>{selectedCount}</span>
               Selected
@@ -942,11 +980,18 @@ export default function FinanceImportScreen() {
 
           {draft ? (
             <div className="review-table">
-              {draft.rows.map((row) => (
-                <article className="review-row" key={row.id}>
+              {draft.rows.map((row) => {
+                const isUncategorized = !isReviewRowCategorized(row);
+
+                return (
+                <article
+                  className={`review-row${isUncategorized ? " uncategorized" : ""}`}
+                  key={row.id}
+                >
                   <label className="row-select">
                     <input
                       checked={selectedRows.has(row.id)}
+                      disabled={isUncategorized}
                       type="checkbox"
                       onChange={() => toggleRow(row.id)}
                     />
@@ -974,7 +1019,11 @@ export default function FinanceImportScreen() {
                       ))}
                       <option value="__create__">+ Add new category…</option>
                     </select>
-                    {row.categorySource === "learned" ? (
+                    {isUncategorized ? (
+                      <span className="row-uncategorized-tag">
+                        Pick a category to include
+                      </span>
+                    ) : row.categorySource === "learned" ? (
                       <span>Learned</span>
                     ) : null}
                   </div>
@@ -991,7 +1040,8 @@ export default function FinanceImportScreen() {
                     <p className="row-reasons">{row.reviewReasons.join(" ")}</p>
                   ) : null}
                 </article>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="empty-review">Parse a TD statement to review rows.</div>

@@ -446,7 +446,12 @@ export function createFinanceRepository({
     let createdTransactionCount = 0;
     let duplicateTransactionCount = 0;
 
-    rows.forEach((row) => {
+    // Safety net: an uncategorized row must never reach the ledger, no matter
+    // what the review UI passed in. This is the single chokepoint shared by
+    // every storage backend.
+    const categorizedRows = rows.filter((row) => Boolean(row.transaction?.categoryId));
+
+    categorizedRows.forEach((row) => {
       const transaction = row.transaction;
       const isDuplicate =
         transaction.importFingerprint &&
@@ -468,7 +473,7 @@ export function createFinanceRepository({
 
     const savedImportBatch = {
       ...importBatch,
-      rowCount: rows.length,
+      rowCount: categorizedRows.length,
       createdTransactionCount,
       duplicateTransactionCount,
     };

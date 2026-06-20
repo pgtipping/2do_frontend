@@ -146,6 +146,7 @@ test("repository saves reviewed import batches with created and duplicate counts
     createId: repository.createId,
     now: repository.now,
     accountId: "acct_1",
+    categoryId: "cat_groceries",
     date: "2025-01-02",
     description: "WALMART STORE",
     amount: -42.91,
@@ -201,6 +202,70 @@ test("repository saves reviewed import batches with created and duplicate counts
     createdTransactionCount: 1,
     duplicateTransactionCount: 1,
   });
+});
+
+test("reviewed import never writes uncategorized rows to the ledger", async () => {
+  const repository = createFinanceRepository({
+    driver: createMemoryStorageDriver(),
+    now: () => "2026-05-24T06:00:00.000Z",
+    createId: (prefix) => `${prefix}_fixed`,
+  });
+
+  const categorizedRow = {
+    status: "ready",
+    transaction: createTransaction({
+      createId: repository.createId,
+      now: repository.now,
+      accountId: "acct_1",
+      categoryId: "cat_groceries",
+      date: "2025-01-02",
+      description: "WALMART STORE",
+      amount: -42.91,
+      type: "expense",
+      source: "td_bank_pdf",
+      rawNarration: "WALMART STORE",
+      importFingerprint: "td-walmart-2025-01-02-42.91",
+    }),
+  };
+  const uncategorizedRow = {
+    status: "ready",
+    transaction: createTransaction({
+      createId: repository.createId,
+      now: repository.now,
+      accountId: "acct_1",
+      categoryId: null,
+      date: "2025-01-03",
+      description: "MYSTERY DEBIT",
+      amount: -9.99,
+      type: "expense",
+      source: "td_bank_pdf",
+      rawNarration: "MYSTERY DEBIT",
+      importFingerprint: "td-mystery-2025-01-03-9.99",
+    }),
+  };
+
+  const result = await repository.saveReviewedImport({
+    importBatch: {
+      id: "batch_1",
+      source: "td_bank_pdf",
+      importedAt: "2026-05-24T06:00:00.000Z",
+      fileName: "td.pdf",
+      rowCount: 2,
+      createdTransactionCount: 0,
+      duplicateTransactionCount: 0,
+    },
+    rows: [categorizedRow, uncategorizedRow],
+  });
+  const saved = await repository.loadData();
+
+  assert.equal(result.createdTransactionCount, 1);
+  assert.equal(result.rowCount, 1);
+  assert.equal(saved.transactions.length, 1);
+  assert.equal(saved.transactions[0].categoryId, "cat_groceries");
+  assert.ok(
+    saved.transactions.every((txn) => Boolean(txn.categoryId)),
+    "no uncategorized transaction should ever be persisted"
+  );
 });
 
 test("repository remembers reviewed transaction labels as future import rules", async () => {

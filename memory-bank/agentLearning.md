@@ -1,5 +1,11 @@
 # Agent Learning
 
+## 2026-06-20 02:26:01 - A new save-time filter can break tests that incidentally relied on the old permissive behavior
+
+When adding a validation/filter at a storage write chokepoint (here: `saveReviewedImport` now drops rows with no `categoryId`), grep existing tests of that function BEFORE running them. The pre-existing "duplicate count" test built its rows from a fixture transaction that happened to have no `categoryId` — categorization was irrelevant to what it tested, but the new filter would have silently dropped both rows and failed the assertions. The fix was to give that test's fixtures a category (preserving its real intent) rather than weakening the new rule. Lesson: a fixture's incidental properties can become load-bearing the moment you tighten the code path it exercises.
+
+Also reaffirmed the right place for an invariant like "never persist X": the single shared chokepoint, not the UI. The import UI already prevented selecting uncategorized rows, but the guarantee belongs in `saveReviewedImport` because it is the one function both the IndexedDB and Supabase backends route through. UI guards are for UX; the chokepoint filter is the actual guarantee.
+
 ## 2026-06-19 02:00:26 - The ERESOLVE conflict was dead code; deleting it beat working around it
 
 The repo's `npm install` ERESOLVE failure (documented in the 2026-06-01 entry as "always use --legacy-peer-deps") was caused by `react-speech-kit@3` (peer: React 16) — a leftover from the original todo app that the finance app never imported. The durable fix was deleting the dead todo code and its 21 unused deps; afterward `npm install` resolves cleanly with no flag and no `.npmrc`. So the earlier "always use --legacy-peer-deps" advice is now obsolete. Before reaching for a `legacy-peer-deps` workaround, check whether the conflicting package is even used — a dead dep is better deleted than worked around.

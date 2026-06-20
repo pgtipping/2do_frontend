@@ -1,5 +1,22 @@
 # Active Context
 
+## 2026-06-20 02:26:01 - Import Review: highlight uncategorized rows + block them from the ledger
+
+User asked that uncategorized rows in Import Review be easy to spot and never slip into the ledger. Chosen UX (via AskUserQuestion): "lock the row, save the rest" — uncategorized rows are blocked but categorized rows still import.
+
+What was wrong before: after parsing, EVERY row was auto-checked, and "Save Selected" wrote all checked rows — including uncategorized ones. A row could even show a green "Ready" badge while uncategorized, because that badge reflects parser confidence/reconciliation, NOT whether a category is set.
+
+Three changes:
+- Highlight: uncategorized rows get an amber left bar + tinted background + a "Pick a category to include" tag. New "Uncategorized: N" metric next to Ready/Review/Selected (amber when > 0). Files: `FinanceImportScreen.jsx`, `FinanceImportScreen.css`.
+- Lock: uncategorized row's checkbox is disabled+unchecked; parse now default-selects only categorized rows; `toggleRow` refuses to select an uncategorized row; assigning a category auto-selects the row, clearing it auto-deselects (`updateRowCategory`).
+- Safety net (the guarantee): `saveReviewedImport` in `localFinanceStore.js:444` filters out any row with no `categoryId` before writing. This is the single chokepoint shared by BOTH storage backends (IndexedDB + Supabase), so nothing uncategorized can reach the ledger no matter what the UI passes. `rowCount` now reflects the categorized rows actually imported.
+
+Tests: added "reviewed import never writes uncategorized rows to the ledger" to `financeCore.test.mjs`. Also fixed the pre-existing duplicate-count test, which incidentally relied on uncategorized fixtures being saved — gave its rows a `categoryId` (its intent is duplicate counting, unaffected). Verified: 49 node + 5 vitest pass, build green (7.94s, 103 modules).
+
+Live-verified in Chrome on the dev server (signed in as the user, synthetic TD sample — NOT saved, real ledger untouched): 7 parsed rows → 4 auto-categorized via learned rules (checked) + 3 uncategorized (amber left bar, tinted bg, "Pick a category to include" tag, disabled+unchecked checkbox). Metric chip "Uncategorized: 3" rendered amber. Assigning a category to the "TRANSFER TO SAVINGS" row (app already has a "Transfers" category) cleared the highlight, enabled+checked its checkbox, dropped Uncategorized 3→2 and raised Selected 4→5. Discarded the synthetic draft via reload afterward.
+
+NOT committed (local on `main`); push only on user signal.
+
 ## 2026-06-19 02:00:26 - Removed the dead 2do (todo) app; repo is now finance-only
 
 The repo was the original `2do` todo app with the finance app built on top; the todo code was never removed. Deleted it all: `src/components/` (17 todo components), `src/contexts/NotificationContext.jsx`, `src/utils/` (9 todo helpers), `src/App.css` (45 files total). Renamed the package `react-todo-app` -> `personal-finance-app`. `src/finance/` was already self-contained (imports nothing from the deleted dirs), so nothing broke.

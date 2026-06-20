@@ -257,8 +257,18 @@
 .import-metrics {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 14px;
+}
+
+.import-metrics div.metric-uncategorized {
+  background: #fdeee0;
+  border-color: #f3c79a;
+  color: #8a4b12;
+}
+
+.import-metrics div.metric-uncategorized span {
+  color: #b4540c;
 }
 
 .import-metrics div {
@@ -306,6 +316,12 @@
   padding: 12px;
 }
 
+.review-row.uncategorized {
+  background: #fff8f1;
+  border-color: #f3c79a;
+  box-shadow: inset 4px 0 0 #e8841f;
+}
+
 .row-select {
   align-items: center;
   color: #596a60;
@@ -321,6 +337,11 @@
   accent-color: #1f5a41;
   height: 16px;
   width: 16px;
+}
+
+.row-select input:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 .row-main {
@@ -374,6 +395,12 @@
   font-weight: 800;
   justify-self: start;
   padding: 4px 8px;
+}
+
+.row-category span.row-uncategorized-tag {
+  background: #fde7d4;
+  color: #9a4a0c;
+  text-transform: none;
 }
 
 .row-amount {
@@ -1091,6 +1118,10 @@
 
   .category-list-panel:last-child {
     grid-column: auto;
+  }
+
+  .import-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .review-row,

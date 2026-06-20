@@ -1,5 +1,15 @@
 # Next Steps
 
+## 2026-06-20 02:26:01 - Import Review uncategorized-blocking shipped (local)
+
+Immediate:
+1. Live check in Chrome — DONE (highlight + lock + unlock-on-categorize all verified with a synthetic sample; not saved).
+2. Commit + push this change once the user gives the signal (currently local on `main`, nothing committed).
+
+Still open from prior sessions (unchanged priority):
+- Verify end-to-end magic-link login on the live Vercel site (`https://personal-finance-sooty-sigma.vercel.app`) — the last step of the Vercel deploy; needs an actual login by the user.
+- Backlog: multi-PDF upload; README refresh; Ledger search/filter. 9 npm audit vulns (pdfjs-dist/vite) flagged, not addressed.
+
 ## 2026-06-01 21:04:53 - Finish Supabase cutover
 
 Done this session: Supabase storage driver, magic-link login gate, Sign out, and the JSON restore button (the previously-pending "JSON restore import" item is now built). Build + both test suites green; login gate verified live in Chrome.
