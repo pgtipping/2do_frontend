@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-06-20 04:20:46 - Saved rows leave the Import Review list + clear save confirmation
+
+- After "Save Selected", saved rows are removed from the review list; only unsaved rows (locked uncategorized + any unchecked) remain. The app now stays on the Import tab instead of auto-switching to the Ledger.
+- Added a prominent green confirmation banner at the top of the review panel (headline + duplicate/leftover detail + "View ledger" button + dismiss). The old grey bottom-of-panel line was invisible because the tab switched away instantly.
+- New pure helper `summarizeReviewedImportSave` builds the banner copy with singular/plural + all-duplicates edge cases; 3 unit tests added.
+- Verified: 69 node + 5 vitest pass, build green (4.14s), dev-server smoke clean (no real save performed — protects live data). Local on `main`, not committed/pushed.
+
 ## 2026-06-20 02:26:01 - Import Review blocks uncategorized rows from the ledger
 
 - Uncategorized rows are now highlighted (amber bar + tag + an "Uncategorized: N" metric) and cannot be saved: their checkbox is disabled, parse default-selects only categorized rows, and assigning/clearing a category syncs the selection.

@@ -1,5 +1,14 @@
 # Next Steps
 
+## 2026-06-20 04:20:46 - Save-confirmation + saved-rows-leave-list built (local)
+
+Immediate:
+1. Commit + push once the user gives the signal (currently local on `main`, nothing committed).
+2. Optional: live-demo the post-save green banner. It needs a real save, which writes to the user's Supabase ledger — either the user clicks Save Selected and watches, or do a save+delete cycle only with explicit approval. Unit tests + the approved mockup already cover the banner copy/visual.
+
+Earlier shipped (live): the uncategorized highlight + lock (commit 8fa9075, deployed and verified on production).
+Still open backlog: multi-PDF upload; README refresh; Ledger search/filter; 9 npm audit vulns (pdfjs-dist/vite).
+
 ## 2026-06-20 02:26:01 - Import Review uncategorized-blocking shipped (local)
 
 Immediate:

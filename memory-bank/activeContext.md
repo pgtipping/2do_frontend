@@ -1,5 +1,16 @@
 # Active Context
 
+## 2026-06-20 04:20:46 - Import Review: saved rows leave the list + prominent save confirmation
+
+Follow-up to the uncategorized-block feature. Problem the user hit: after "Save Selected", every row stayed in the review list, and the only signal a save happened was the auto-switch to the Ledger tab (the old `.save-result` text sat at the panel bottom on a tab the user was instantly navigated away from, so it was effectively invisible).
+
+Changes (all in `FinanceImportScreen.jsx` + `.css`, plus a pure helper + tests in `reviewedImportDraft.js`):
+- `saveSelectedRows` now drops the just-saved rows from the draft and keeps the rest (the locked uncategorized rows + any categorized row left unchecked). It no longer auto-switches to the Ledger — it STAYS on Import so the confirmation and leftovers are visible. If nothing remains, the draft is cleared (empty list) but stays on Import.
+- New prominent green confirmation banner at the TOP of the review panel (was a small grey line at the bottom): headline + detail + a "View ledger" button (user-initiated tab switch, replacing the old automatic one) + a dismiss "x". Tone is green for success, neutral when only duplicates.
+- New pure helper `summarizeReviewedImportSave({createdTransactionCount, duplicateTransactionCount, remainingCount})` returns `{tone, headline, detail}`. Edge cases handled: singular/plural ("1 transaction" / "1 row still needs"), all-duplicates ("No new transactions — that row was / all N rows were already in your ledger"), and it does NOT repeat "Skipped N duplicates" in the detail when nothing new landed (headline already says it). 3 unit tests cover these.
+
+UX was approved via an inline mockup before building. Verified: 69 node tests (incl. 3 new) + 5 vitest pass, build green (4.14s). Live dev-server smoke (non-destructive, no save): new code loads via HMR, lock behavior intact, Save Selected correctly disabled when only uncategorized rows exist, no console errors. NOTE: did NOT exercise a real save against the live Supabase ledger (would write synthetic transactions to the user's real data) — the post-save banner copy is covered by unit tests + the approved mockup. NOT committed (local on `main`); push only on user signal.
+
 ## 2026-06-20 02:26:01 - Import Review: highlight uncategorized rows + block them from the ledger
 
 User asked that uncategorized rows in Import Review be easy to spot and never slip into the ledger. Chosen UX (via AskUserQuestion): "lock the row, save the rest" — uncategorized rows are blocked but categorized rows still import.

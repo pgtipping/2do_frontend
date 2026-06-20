@@ -10,6 +10,7 @@ import {
   FaListUl,
   FaSignOutAlt,
   FaTags,
+  FaTimes,
   FaTrash,
 } from "react-icons/fa";
 import { mergeCategoriesWithDefaults } from "../categories";
@@ -20,7 +21,10 @@ import { createSupabaseStorageDriver } from "../storage/supabaseFinanceDriver";
 import { supabase } from "../storage/supabaseClient";
 import { extractTextFromPdfFile } from "../imports/pdfTextExtractor";
 import { parseTdBankStatementText } from "../imports/tdBankStatementParser";
-import { createReviewedImportDraft } from "../imports/reviewedImportDraft";
+import {
+  createReviewedImportDraft,
+  summarizeReviewedImportSave,
+} from "../imports/reviewedImportDraft";
 import {
   ALL_MONTHS,
   calculateCategorySpending,
@@ -349,15 +353,21 @@ export default function FinanceImportScreen() {
       return;
     }
 
+    const savedRowIds = new Set(selectedRows);
     const selectedDraft = {
       ...draft,
-      rows: draft.rows.filter((row) => selectedRows.has(row.id)),
+      rows: draft.rows.filter((row) => savedRowIds.has(row.id)),
     };
     const result = await repository.saveReviewedImport(selectedDraft);
-
-    setSaveResult(result);
     await loadFinanceData();
-    setActiveTab("ledger");
+
+    // Drop the just-saved rows from the review list; keep the rest (the locked
+    // uncategorized rows plus any categorized row left unchecked). Stay on the
+    // Import tab so the confirmation and the leftovers are visible.
+    const remainingRows = draft.rows.filter((row) => !savedRowIds.has(row.id));
+    setSelectedRows(new Set());
+    setSaveResult({ ...result, remainingCount: remainingRows.length });
+    setDraft(remainingRows.length > 0 ? { ...draft, rows: remainingRows } : null);
   };
 
   const startEditingTransaction = (transaction) => {
@@ -772,6 +782,13 @@ export default function FinanceImportScreen() {
   const uncategorizedCount =
     draft?.rows.filter((row) => !isReviewRowCategorized(row)).length || 0;
   const selectedCount = selectedRows.size;
+  const saveSummary = saveResult
+    ? summarizeReviewedImportSave({
+        createdTransactionCount: saveResult.createdTransactionCount,
+        duplicateTransactionCount: saveResult.duplicateTransactionCount,
+        remainingCount: saveResult.remainingCount ?? 0,
+      })
+    : null;
   const monthOptions = Array.from(
     new Set(transactions.map((transaction) => getMonthKey(transaction.date)))
   ).sort();
@@ -959,6 +976,35 @@ export default function FinanceImportScreen() {
             </button>
           </div>
 
+          {saveSummary ? (
+            <div
+              className={`save-confirmation ${saveSummary.tone}`}
+              role="status"
+              aria-live="polite"
+            >
+              <FaCheck className="save-confirmation-icon" aria-hidden="true" />
+              <div className="save-confirmation-text">
+                <strong>{saveSummary.headline}</strong>
+                {saveSummary.detail ? <span>{saveSummary.detail}</span> : null}
+              </div>
+              <button
+                className="save-confirmation-link"
+                type="button"
+                onClick={() => setActiveTab("ledger")}
+              >
+                View ledger
+              </button>
+              <button
+                className="save-confirmation-dismiss"
+                type="button"
+                aria-label="Dismiss"
+                onClick={() => setSaveResult(null)}
+              >
+                <FaTimes aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
+
           <div className="import-metrics" aria-label="Import metrics">
             <div>
               <span>{readyCount}</span>
@@ -1056,13 +1102,6 @@ export default function FinanceImportScreen() {
                 </div>
               ))}
             </div>
-          ) : null}
-
-          {saveResult ? (
-            <p className="save-result">
-              Saved {saveResult.createdTransactionCount} new transactions.
-              Skipped {saveResult.duplicateTransactionCount} duplicates.
-            </p>
           ) : null}
         </div>
         </section>

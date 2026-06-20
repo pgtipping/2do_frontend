@@ -1,8 +1,53 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { createReviewedImportDraft } from "../reviewedImportDraft.js";
+import {
+  createReviewedImportDraft,
+  summarizeReviewedImportSave,
+} from "../reviewedImportDraft.js";
 import { createCategory, createCategoryRule } from "../../domain.js";
+
+test("save summary reports created count, duplicates, and remaining rows", () => {
+  const summary = summarizeReviewedImportSave({
+    createdTransactionCount: 56,
+    duplicateTransactionCount: 3,
+    remainingCount: 3,
+  });
+
+  assert.equal(summary.tone, "success");
+  assert.equal(summary.headline, "Saved 56 transactions to your ledger.");
+  assert.equal(
+    summary.detail,
+    "Skipped 3 duplicates. 3 rows still need a category, kept below."
+  );
+});
+
+test("save summary uses singular nouns and omits empty detail", () => {
+  const summary = summarizeReviewedImportSave({
+    createdTransactionCount: 1,
+    duplicateTransactionCount: 0,
+    remainingCount: 0,
+  });
+
+  assert.equal(summary.tone, "success");
+  assert.equal(summary.headline, "Saved 1 transaction to your ledger.");
+  assert.equal(summary.detail, null);
+});
+
+test("save summary handles an all-duplicates save with no new rows", () => {
+  const summary = summarizeReviewedImportSave({
+    createdTransactionCount: 0,
+    duplicateTransactionCount: 2,
+    remainingCount: 1,
+  });
+
+  assert.equal(summary.tone, "neutral");
+  assert.equal(
+    summary.headline,
+    "No new transactions — all 2 rows were already in your ledger."
+  );
+  assert.equal(summary.detail, "1 row still needs a category, kept below.");
+});
 
 test("creates review rows from parsed TD Bank transactions", () => {
   const draft = createReviewedImportDraft({
