@@ -1035,8 +1035,9 @@
 }
 
 .report-controls {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   justify-content: space-between;
   margin-bottom: 18px;
@@ -1057,87 +1058,272 @@
   width: 16px;
 }
 
-.report-grid {
-  display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
-}
-
-.report-main,
-.report-side section {
-  background: #ffffff;
-  border: 1px solid rgba(190, 204, 194, 0.8);
-  border-radius: 8px;
-  box-shadow: 0 18px 48px rgba(39, 55, 45, 0.1);
-  padding: 18px;
-}
-
-.report-main h2 {
-  color: #17241d;
-  font-size: 34px;
-  margin: 0 0 18px;
-}
-
-.cashflow-bars {
-  align-items: end;
-  background: #f7f9f5;
-  border: 1px solid #dfe8df;
-  border-radius: 8px;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  height: 360px;
-  padding: 18px;
-}
-
-.cashflow-bars div {
+.month-chip-row {
   align-items: center;
-  background: #1f5a41;
-  border-radius: 8px 8px 4px 4px;
-  color: #ffffff;
   display: flex;
-  flex-direction: column;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.month-chip {
+  background: #f8faf6;
+  border: 1px solid #d6e0d8;
+  border-radius: 999px;
+  color: #44574c;
+  cursor: pointer;
+  font: inherit;
   font-size: 13px;
-  font-weight: 800;
-  justify-content: end;
-  min-height: 80px;
-  padding: 14px 10px;
+  font-weight: 700;
+  padding: 6px 13px;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.month-chip:hover {
+  border-color: #1f5a41;
+}
+
+.month-chip.active {
+  background: #1f5a41;
+  border-color: #1f5a41;
+  color: #ffffff;
+}
+
+.month-chip.ghost {
+  color: #7a8a80;
+}
+
+.chip-divider {
+  align-self: stretch;
+  border-left: 1px solid #d6e0d8;
+  margin: 2px 4px;
+}
+
+.report-empty {
+  background: #ffffff;
+  border: 1px dashed #c4d2c8;
+  border-radius: 12px;
+  color: #55665c;
+  font-size: 15px;
+  padding: 44px 18px;
   text-align: center;
 }
 
-.cashflow-bars div:nth-child(2) {
-  background: #8b4d2f;
-}
-
-.cashflow-bars div:nth-child(3) {
-  background: #64748b;
-}
-
-.cashflow-bars span {
-  display: block;
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 6px;
-}
-
-.report-side {
+.report-cards {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+}
+
+.report-card {
+  background: #ffffff;
+  border: 1px solid rgba(190, 204, 194, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(39, 55, 45, 0.06);
+  padding: 18px 20px;
+}
+
+.report-card-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.report-card-title {
+  color: #17241d;
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 14px;
+}
+
+.report-card-head .report-card-title {
+  margin: 0;
+}
+
+.report-scope {
+  background: #eef4f0;
+  border-radius: 999px;
+  color: #36544a;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 12px;
+}
+
+.cash-summary-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.stat-tile {
+  background: #f5f8f3;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+}
+
+.stat-tile span {
+  color: #5f7066;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.stat-tile strong {
+  color: #17241d;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tile.income strong {
+  color: #0f6e56;
+}
+
+.stat-tile.spending strong {
+  color: #99401d;
+}
+
+.category-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.category-bar-head {
+  color: #28342d;
+  display: flex;
+  font-size: 13px;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.category-bar-track {
+  background: #eef2ee;
+  border-radius: 5px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.category-bar-fill {
+  background: #d85a30;
+  border-radius: 5px;
+  height: 8px;
+  min-width: 2px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+}
+
+.legend-key {
+  color: #5f7066;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.legend-key::before {
+  border-radius: 3px;
+  content: "";
+  display: inline-block;
+  height: 10px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  width: 10px;
+}
+
+.legend-key.income::before {
+  background: #1d9e75;
+}
+
+.legend-key.spending::before {
+  background: #d85a30;
+}
+
+.trend-chart {
+  align-items: flex-end;
+  display: flex;
+  gap: 14px;
+  height: 200px;
+  overflow-x: auto;
+  padding-top: 8px;
+}
+
+.trend-col {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 46px;
+}
+
+.trend-bars {
+  align-items: flex-end;
+  display: flex;
+  gap: 5px;
+  height: 160px;
+  justify-content: center;
+  width: 100%;
+}
+
+.trend-bar {
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+  width: 18px;
+}
+
+.trend-bar.income {
+  background: #1d9e75;
+}
+
+.trend-bar.spending {
+  background: #d85a30;
+}
+
+.trend-label {
+  color: #617268;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.money-went-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .report-list-row {
   align-items: center;
-  border-top: 1px solid #e4ebe5;
+  border-top: 1px solid #e7ede8;
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  min-height: 44px;
+  min-height: 40px;
+  padding: 5px 0;
 }
 
-.report-list-row span {
-  color: #304239;
-  display: grid;
-  gap: 3px;
+.report-list-row .label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.report-list-row .label > span {
+  color: #2a362f;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .report-list-row small {
@@ -1148,6 +1334,15 @@
 .report-list-row strong {
   color: #17241d;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.report-list-row strong.amount-in {
+  color: #0f6e56;
+}
+
+.report-list-row strong.amount-out {
+  color: #99401d;
 }
 
 @media (max-width: 980px) {
@@ -1177,7 +1372,6 @@
   .import-workspace,
   .category-layout,
   .subscriptions-layout,
-  .report-grid,
   .summary-strip {
     grid-template-columns: 1fr;
   }

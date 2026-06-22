@@ -1,5 +1,23 @@
 # Next Steps
 
+## 2026-06-21 22:22:23 - Reports rebuild built (local) — two features pending commit
+
+TWO uncommitted features on `main`, to land as SEPARATE commits on the user's signal:
+1. Ledger sort control (5 fields).
+2. Reports page rebuild (multi-month chips + 4 cards).
+
+Possible follow-up the user may want: in Reports, "spending" currently includes transfers to other people (Zelle-sent), which makes the spending total / savings rate look extreme on the real data. Offer to split transfers-to-others out of "spending" (or show them as their own line) if that framing isn't wanted.
+
+Backlog: multi-PDF upload; README refresh; 9 npm audit vulns (pdfjs-dist/vite).
+
+## 2026-06-21 21:12:19 - Ledger sort control built (local)
+
+Immediate: commit + push the ledger sort on the user's signal (currently local on `main`).
+Live-verified non-destructively; no further verification needed.
+
+Earlier shipped (live on production): uncategorized highlight + lock (8fa9075); saved-rows-leave-list + save confirmation (0ccc3db).
+Backlog: multi-PDF upload; README refresh; Ledger search/filter (sort now done); 9 npm audit vulns (pdfjs-dist/vite).
+
 ## 2026-06-20 04:20:46 - Save-confirmation + saved-rows-leave-list built (local)
 
 Immediate:

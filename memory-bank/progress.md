@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-06-21 22:22:23 - Reports page rebuilt (multi-month + 4 cards)
+
+- Reports now has its own multi-month chip picker (independent of the Ledger) with All months / Clear / per-month toggles and an empty state.
+- Four cards: Cash summary (with savings rate), Spending by category (ranked + share %), Income vs spending by month (grouped CSS bars), Where the money went (top merchants + largest transactions). Polished card design, teal income / coral spending.
+- 6 new pure helpers in reports.js (filterTransactionsByMonths, rankCategorySpending, calculateTopMerchants, getLargestTransactions, calculateMonthlyTrend; calculateCategorySpending gained includeSelfTransfers) with unit tests.
+- Removed the old single cashflow report, the getBarHeight helper, and the Reports "Upcoming subscriptions" panel (covered by the Subscriptions tab).
+- Verified: 82 node + 5 vitest pass, build green; live-checked all cards + chip interactions against the real 332-tx ledger, no console errors. Local on `main`, not committed. (Ledger sort from 21:12 also still uncommitted — keep as separate commits.)
+
+## 2026-06-21 21:12:19 - Ledger sort control added
+
+- New "Sort by" dropdown in the Ledger header: Date, Amount, Name, Category, Type — each both directions, grouped by `<optgroup>`. Default unchanged (newest first).
+- Amount sorts by magnitude (size, sign-agnostic); ties fall back to newest-date-first; uncategorized rows last under Category; Type uses a fixed income→expense→transfer order.
+- Pure `sortTransactions` helper + `LEDGER_SORT_GROUPS` in `reports.js` with 7 new unit tests.
+- Verified: 76 node + 5 vitest pass, build green; live-checked all five modes against the real 332-transaction ledger (non-destructive). Local on `main`, not committed/pushed.
+
 ## 2026-06-20 04:20:46 - Saved rows leave the Import Review list + clear save confirmation
 
 - After "Save Selected", saved rows are removed from the review list; only unsaved rows (locked uncategorized + any unchecked) remain. The app now stays on the Import tab instead of auto-switching to the Ledger.

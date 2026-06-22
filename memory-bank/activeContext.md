@@ -1,5 +1,37 @@
 # Active Context
 
+## 2026-06-21 22:22:23 - Reports page rebuilt: multi-month picker + 4 report cards (polished design)
+
+User wanted (1) to select any number of months in Reports, then (2) several reports instead of the single cashflow view, and (3) a less-basic design. Approved an inline mockup (teal income / coral spending, card layout) before building.
+
+The Reports page now has its OWN month selection (independent of the Ledger's `selectedMonth`), driven by a row of toggle chips: "All months", "Clear", and one chip per month. State `reportMonths` is null=all, else an explicit `["YYYY-MM"]` list; `effectiveReportMonths = reportMonths ?? monthOptions`. Empty selection → "Pick at least one month" empty state. Scope label shows "All months" / a single month / "N months".
+
+Four report cards, all filtered to the picked months and respecting the Include-self-transfers toggle consistently:
+- Cash summary — income, spending, left over (net), self-transfers, savings rate (net/income, "—" when income is 0).
+- Spending by category — `rankCategorySpending` rows with $ + share % + a coral bar.
+- Income vs spending by month — CSS grouped bars (teal income, coral spending) per selected month via `calculateMonthlyTrend`.
+- Where the money went — `calculateTopMerchants` + `getLargestTransactions` (largest by magnitude, signed colour).
+
+New pure helpers in `reports.js` (all tested): `filterTransactionsByMonths`, `rankCategorySpending`, `calculateTopMerchants`, `getLargestTransactions`, `calculateMonthlyTrend`, plus `calculateCategorySpending` gained an `includeSelfTransfers` option (backward compatible). Removed the old single-report JSX, the `getBarHeight` helper, and the Reports "Upcoming subscriptions" panel (it lives on the Subscriptions tab; flagged to the user). "Spending" = expense + transfer_to_other (+ transfer_to_self only when the toggle is on).
+
+DATA NOTE: with the real ledger (332 tx, all months) spending shows ~$25.5k vs income ~$9.3k → savings rate -173%, because transfers-to-others (many $1,000 Zelle-sent rows) count as spending. Correct per the definition; flagged to the user in case they want transfers-to-others split out of "spending" later.
+
+Verified: 82 node tests (incl. 6 new report-helper tests) + 5 vitest pass, build green (4.74s). Live on dev server against real data: all 4 cards render, chips toggle (all/clear/single/multi), empty state + scope label work, no console errors. Non-destructive (read-only views). NOT committed (local on `main`).
+
+TWO uncommitted features now stacked on `main`: the ledger sort (21:12) and this Reports rebuild. Keep them as SEPARATE commits when the user gives the push signal.
+
+## 2026-06-21 21:12:19 - Ledger sort control (5 fields)
+
+Added a "Sort by" dropdown to the Ledger header (next to the month filter). Ledger entries were previously hard-sorted newest-date-first with no user control.
+
+Five sortable fields, each with both directions, grouped via `<optgroup>` so options are self-describing open or closed: Date (Newest/Oldest first), Amount (Largest/Smallest), Name (A–Z/Z–A by merchant||description), Category (A–Z/Z–A, uncategorized always last), Type (Income first / Transfers first — fixed order income→expense→transfer_to_other→transfer_to_self). User asked for type + category on top of the date/amount/name set.
+
+Key decisions: Amount sorts by MAGNITUDE (Math.abs), so a +$2,200 paycheck and a −$800 rent both rank as "big" — confirmed live (a +$1,000 and −$1,000 sat adjacent). Ties fall back to newest-date-first for stability. Default is `date_desc` (unchanged behavior).
+
+Implementation: pure `sortTransactions(transactions, sortOrder, {categoryById})` + `LEDGER_SORT_GROUPS` + `DEFAULT_LEDGER_SORT` in `reports.js`; new `sortOrder` state + the dropdown in `FinanceImportScreen.jsx` (reuses `.month-select` styling, capped 160px, header already wraps). The sort select reuses the existing `.month-select` CSS — no new CSS needed. `categoryById` was moved above `monthTransactions` so the sort can read category names.
+
+Verified: 76 node tests (incl. 7 new sort tests) + 5 vitest pass, build green (7.87s). Live on dev server against the real ledger (now 332 transactions): all five modes reorder correctly — date_desc newest, date_asc oldest, amount_desc by size (sign-agnostic), amount_asc smallest, type_asc income-first. Non-destructive (display-only, no writes). NOT committed (local on `main`); push only on user signal.
+
 ## 2026-06-20 04:20:46 - Import Review: saved rows leave the list + prominent save confirmation
 
 Follow-up to the uncategorized-block feature. Problem the user hit: after "Save Selected", every row stayed in the review list, and the only signal a save happened was the auto-switch to the Ledger tab (the old `.save-result` text sat at the panel bottom on a tab the user was instantly navigated away from, so it was effectively invisible).

@@ -27,9 +27,15 @@ import {
 } from "../imports/reviewedImportDraft";
 import {
   ALL_MONTHS,
-  calculateCategorySpending,
+  DEFAULT_LEDGER_SORT,
+  LEDGER_SORT_GROUPS,
   calculateMonthlySummary,
-  getUpcomingSubscriptions,
+  calculateMonthlyTrend,
+  calculateTopMerchants,
+  filterTransactionsByMonths,
+  getLargestTransactions,
+  rankCategorySpending,
+  sortTransactions,
 } from "../reports";
 import {
   createJsonBackup,
@@ -102,14 +108,6 @@ function getMonthKey(date) {
   return date.slice(0, 7);
 }
 
-function getBarHeight(value, maxValue) {
-  if (!maxValue) {
-    return "12%";
-  }
-
-  return `${Math.max(12, Math.round((Math.abs(value) / maxValue) * 100))}%`;
-}
-
 function downloadTextFile(fileName, text, type) {
   const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
@@ -136,6 +134,9 @@ export default function FinanceImportScreen() {
   const [financeData, setFinanceData] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(ALL_MONTHS);
+  const [sortOrder, setSortOrder] = useState(DEFAULT_LEDGER_SORT);
+  // null = all months selected; otherwise an explicit list of "YYYY-MM" keys.
+  const [reportMonths, setReportMonths] = useState(null);
   const [includeSelfTransfers, setIncludeSelfTransfers] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState(null);
   const [transactionForm, setTransactionForm] = useState(null);
@@ -796,30 +797,66 @@ export default function FinanceImportScreen() {
     month: selectedMonth,
     includeSelfTransfers,
   });
-  const categorySpending = calculateCategorySpending(transactions, {
-    month: selectedMonth,
-  });
-  const sortedCategorySpending = Object.entries(categorySpending).sort(
-    (first, second) => second[1] - first[1]
+  const categoryById = new Map(
+    categories.map((category) => [category.id, category])
   );
-  const maxCashflowValue = Math.max(
-    monthSummary.income,
-    monthSummary.expenses,
-    monthSummary.selfTransfers
+
+  // Reports have their own month selection, independent of the Ledger filter.
+  const effectiveReportMonths = reportMonths ?? monthOptions;
+  const reportTransactions = filterTransactionsByMonths(
+    transactions,
+    effectiveReportMonths
   );
-  const upcomingSubscriptions = getUpcomingSubscriptions(subscriptions, {
-    today: new Date().toISOString().slice(0, 10),
-    daysAhead: 30,
+  const reportSummary = calculateMonthlySummary(reportTransactions, {
+    month: ALL_MONTHS,
+    includeSelfTransfers,
   });
-  const monthTransactions = transactions
-    .filter((transaction) =>
+  const reportSavingsRate =
+    reportSummary.income > 0 ? reportSummary.net / reportSummary.income : null;
+  const reportCategories = rankCategorySpending(reportTransactions, {
+    month: ALL_MONTHS,
+    includeSelfTransfers,
+  });
+  const reportTopMerchants = calculateTopMerchants(reportTransactions, {
+    includeSelfTransfers,
+    limit: 6,
+  });
+  const reportLargest = getLargestTransactions(reportTransactions, { limit: 6 });
+  const reportTrend = calculateMonthlyTrend(
+    reportTransactions,
+    effectiveReportMonths,
+    { includeSelfTransfers }
+  );
+  const reportTrendMax = Math.max(
+    1,
+    ...reportTrend.map((entry) => Math.max(entry.income, entry.expenses))
+  );
+  const reportAllMonthsSelected =
+    reportMonths === null ||
+    (monthOptions.length > 0 &&
+      effectiveReportMonths.length === monthOptions.length);
+  const reportScopeLabel = reportAllMonthsSelected
+    ? "All months"
+    : effectiveReportMonths.length === 1
+      ? effectiveReportMonths[0]
+      : `${effectiveReportMonths.length} months`;
+
+  const toggleReportMonth = (month) => {
+    setReportMonths((current) => {
+      const base = current ?? monthOptions;
+      return base.includes(month)
+        ? base.filter((entry) => entry !== month)
+        : [...base, month].sort();
+    });
+  };
+  const monthTransactions = sortTransactions(
+    transactions.filter((transaction) =>
       selectedMonth === ALL_MONTHS
         ? true
         : getMonthKey(transaction.date) === selectedMonth
-    )
-    .sort((first, second) => second.date.localeCompare(first.date));
-  const categoryById = new Map(
-    categories.map((category) => [category.id, category])
+    ),
+    sortOrder,
+    { categoryById }
   );
   const getSelectableCategories = (selectedCategoryId) =>
     categories.filter(
@@ -1157,6 +1194,22 @@ export default function FinanceImportScreen() {
                       {month}
                     </option>
                   ))}
+              </select>
+              <select
+                className="month-select"
+                aria-label="Sort transactions"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value)}
+              >
+                {LEDGER_SORT_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
           </div>
@@ -1981,22 +2034,36 @@ export default function FinanceImportScreen() {
       {activeTab === "reports" ? (
         <section className="reports-workspace">
           <div className="report-controls">
-            <select
-              className="month-select"
-              aria-label="Select report month"
-              value={selectedMonth}
-              onChange={(event) => setSelectedMonth(event.target.value)}
-            >
-              <option value={ALL_MONTHS}>All months</option>
-              {[selectedMonth, ...monthOptions]
-                .filter((month) => month && month !== ALL_MONTHS)
-                .filter((month, index, months) => months.indexOf(month) === index)
-                .map((month) => (
-                  <option key={month} value={month}>
-                    {month}
-                  </option>
-                ))}
-            </select>
+            <div className="month-chip-row" aria-label="Select report months">
+              <button
+                type="button"
+                className={`month-chip ${reportAllMonthsSelected ? "active" : ""}`}
+                onClick={() => setReportMonths(null)}
+              >
+                All months
+              </button>
+              <button
+                type="button"
+                className="month-chip ghost"
+                onClick={() => setReportMonths([])}
+              >
+                Clear
+              </button>
+              <span className="chip-divider" aria-hidden="true" />
+              {monthOptions.map((month) => (
+                <button
+                  type="button"
+                  key={month}
+                  className={`month-chip ${
+                    effectiveReportMonths.includes(month) ? "active" : ""
+                  }`}
+                  aria-pressed={effectiveReportMonths.includes(month)}
+                  onClick={() => toggleReportMonth(month)}
+                >
+                  {month}
+                </button>
+              ))}
+            </div>
             <label className="self-transfer-toggle">
               <input
                 checked={includeSelfTransfers}
@@ -2007,83 +2074,158 @@ export default function FinanceImportScreen() {
             </label>
           </div>
 
-          <div className="report-grid">
-            <section className="report-main">
-              <p className="eyebrow">Monthly report</p>
-              <h2>{selectedMonth === ALL_MONTHS ? "All months" : selectedMonth}</h2>
-              <div className="cashflow-bars" aria-label="Monthly cashflow chart">
-                <div
-                  style={{
-                    height: getBarHeight(monthSummary.income, maxCashflowValue),
-                  }}
-                >
-                  <span>{formatMoney(monthSummary.income)}</span>
-                  Income
+          {effectiveReportMonths.length === 0 ? (
+            <div className="report-empty">
+              Pick at least one month to see your reports.
+            </div>
+          ) : (
+            <div className="report-cards">
+              <section className="report-card">
+                <div className="report-card-head">
+                  <h3 className="report-card-title">Cash summary</h3>
+                  <span className="report-scope">{reportScopeLabel}</span>
                 </div>
-                <div
-                  style={{
-                    height: getBarHeight(monthSummary.expenses, maxCashflowValue),
-                  }}
-                >
-                  <span>{formatMoney(monthSummary.expenses)}</span>
-                  Spending
+                <div className="cash-summary-grid">
+                  <div className="stat-tile income">
+                    <span>Income</span>
+                    <strong>{formatMoney(reportSummary.income)}</strong>
+                  </div>
+                  <div className="stat-tile spending">
+                    <span>Spending</span>
+                    <strong>{formatMoney(reportSummary.expenses)}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>Left over</span>
+                    <strong>{formatMoney(reportSummary.net)}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>Self-transfers</span>
+                    <strong>{formatMoney(reportSummary.selfTransfers)}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>Savings rate</span>
+                    <strong>
+                      {reportSavingsRate === null
+                        ? "—"
+                        : `${Math.round(reportSavingsRate * 100)}%`}
+                    </strong>
+                  </div>
                 </div>
-                <div
-                  style={{
-                    height: getBarHeight(
-                      monthSummary.selfTransfers,
-                      maxCashflowValue
-                    ),
-                  }}
-                >
-                  <span>{formatMoney(monthSummary.selfTransfers)}</span>
-                  Self-transfer
-                </div>
-              </div>
-            </section>
+              </section>
 
-            <aside className="report-side">
-              <section>
-                <p className="eyebrow">Category spending</p>
-                {sortedCategorySpending.length > 0 ? (
-                  sortedCategorySpending.map(([categoryId, total]) => (
-                    <div className="report-list-row" key={categoryId}>
-                      <span>
-                        {categoryById.get(categoryId)?.name || "Uncategorized"}
-                      </span>
-                      <strong>{formatMoney(total)}</strong>
-                    </div>
-                  ))
+              <section className="report-card">
+                <h3 className="report-card-title">Spending by category</h3>
+                {reportCategories.length > 0 ? (
+                  <div className="category-bars">
+                    {reportCategories.map((entry) => (
+                      <div className="category-bar-row" key={entry.categoryId}>
+                        <div className="category-bar-head">
+                          <span>
+                            {categoryById.get(entry.categoryId)?.name ||
+                              "Uncategorized"}
+                          </span>
+                          <span className="muted-copy">
+                            {formatMoney(entry.total)} ·{" "}
+                            {Math.round(entry.share * 100)}%
+                          </span>
+                        </div>
+                        <div className="category-bar-track">
+                          <div
+                            className="category-bar-fill"
+                            style={{ width: `${Math.round(entry.share * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <p className="muted-copy">No spending yet for this month.</p>
+                  <p className="muted-copy">No spending in the selected months.</p>
                 )}
               </section>
 
-              <section>
-                <p className="eyebrow">Upcoming subscriptions</p>
-                {upcomingSubscriptions.length > 0 ? (
-                  upcomingSubscriptions.map((subscription) => (
-                    <div className="report-list-row" key={subscription.id}>
-                      <span>
-                        {subscription.name}
-                        <small>
-                          {categoryById.get(subscription.categoryId)?.name ||
-                            "Uncategorized"}{" "}
-                          - {subscription.nextRenewalDate}
-                        </small>
-                      </span>
-                      <strong>
-                        {formatMoney(subscription.amount)} /{" "}
-                        {formatType(subscription.cadence)}
-                      </strong>
+              <section className="report-card">
+                <div className="report-card-head">
+                  <h3 className="report-card-title">Income vs spending by month</h3>
+                  <div className="chart-legend">
+                    <span className="legend-key income">Income</span>
+                    <span className="legend-key spending">Spending</span>
+                  </div>
+                </div>
+                <div className="trend-chart" aria-label="Income vs spending by month">
+                  {reportTrend.map((entry) => (
+                    <div className="trend-col" key={entry.month}>
+                      <div className="trend-bars">
+                        <div
+                          className="trend-bar income"
+                          style={{
+                            height: `${Math.round(
+                              (entry.income / reportTrendMax) * 100
+                            )}%`,
+                          }}
+                          title={`Income ${formatMoney(entry.income)}`}
+                        />
+                        <div
+                          className="trend-bar spending"
+                          style={{
+                            height: `${Math.round(
+                              (entry.expenses / reportTrendMax) * 100
+                            )}%`,
+                          }}
+                          title={`Spending ${formatMoney(entry.expenses)}`}
+                        />
+                      </div>
+                      <span className="trend-label">{entry.month}</span>
                     </div>
-                  ))
-                ) : (
-                  <p className="muted-copy">No subscriptions due soon.</p>
-                )}
+                  ))}
+                </div>
               </section>
-            </aside>
-          </div>
+
+              <section className="report-card">
+                <h3 className="report-card-title">Where the money went</h3>
+                <div className="money-went-grid">
+                  <div>
+                    <p className="eyebrow">Top merchants</p>
+                    {reportTopMerchants.length > 0 ? (
+                      reportTopMerchants.map((entry) => (
+                        <div className="report-list-row" key={entry.merchant}>
+                          <span className="label">
+                            <span>{entry.merchant}</span>
+                          </span>
+                          <strong>{formatMoney(entry.total)}</strong>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted-copy">No spending in these months.</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="eyebrow">Largest transactions</p>
+                    {reportLargest.length > 0 ? (
+                      reportLargest.map((transaction) => (
+                        <div className="report-list-row" key={transaction.id}>
+                          <span className="label">
+                            <span>
+                              {transaction.merchant || transaction.description}
+                            </span>
+                            <small>{transaction.date}</small>
+                          </span>
+                          <strong
+                            className={
+                              transaction.amount >= 0 ? "amount-in" : "amount-out"
+                            }
+                          >
+                            {formatMoney(transaction.amount)}
+                          </strong>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted-copy">No transactions in these months.</p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
         </section>
       ) : null}
     </main>
