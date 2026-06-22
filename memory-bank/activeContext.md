@@ -1,5 +1,25 @@
 # Active Context
 
+## 2026-06-22 02:50:08 - Whole app converted to a dark theme
+
+User asked to "change the entire color scheme to dark mode." Done as a permanent dark theme (not a light/dark toggle) that PRESERVES the brand identity — green accent, teal income, coral spending — inverted onto layered dark surfaces. No JSX/logic changes; CSS only (+ one `<meta name="theme-color">` in `index.html`).
+
+How it's structured (this is the maintainable part): all colors now flow from a single `:root` palette of CSS variables defined in `src/index.css` — surfaces (`--bg`, `--surface`, `--surface-2/3`, `--field`), borders, text (`--text`, `--text-strong`, `--text-muted`, `--text-faint`), brand accent (`--accent`, `--accent-text`, `--on-accent`, `--accent-soft`, `--accent-ring`), finance semantics (`--income`, `--spending`), feedback (success/warning/danger/info bg+border+text), and `--shadow-sm/md/lg`. `index.css` also sets `color-scheme: dark` (so native scrollbars/controls render dark) and `html,body { margin:0; background:var(--bg) }` (the old default body margin would have shown a white border in dark mode). `--primary` kept as a legacy alias of `--accent` so the old (dead) modal styles in index.css resolve.
+
+Files rewritten to reference the palette: `src/index.css`, `src/finance/auth/AuthGate.css`, `src/finance/components/FinanceImportScreen.css` (the big one, ~1540 lines — every hardcoded light hex swapped). AuthGate inputs needed explicit `background:var(--field)` (they previously relied on the browser's white default) + a focus state. Form fields use `--field` (#0f1713, slightly darker than cards) for an inset look. Disabled primary button got `color:var(--text-faint)` (white-on-bright-green text would have been invisible once the disabled bg went dark).
+
+A toggle would now be cheap to add (a second variable set under e.g. `[data-theme="light"]`) — flagged to the user as a follow-up; they asked only for dark.
+
+Verified: build green (3.14s, CSS bundle `index-f756ebac.css`). Live in Chrome on the dev server, signed in as the real user — audited computed colors across Import, Reports (cards/stat tiles/category bars/trend), Categories (form inputs + selects), and the month-picker dropdown overlay. A full-DOM scan for any element rendering a light/opaque background returned **0 light surfaces** — no dark-mode misses. Non-destructive (read-only inspection). NOT committed (local on `main`, stacked on top of the still-uncommitted month-picker/trend fix + the "Insights to your cashflow." hero copy change). Push only on user signal.
+
+## 2026-06-22 02:20:22 - Reports: month picker + trend chart made to scale to 24+ months
+
+User flagged that the horizontal month layout won't work at 24 months. Two fixes (chosen: dropdown checklist):
+- Month picker: replaced the horizontal chip row with a compact dropdown checklist — a native `<details>`/`<summary>` trigger showing "Months · <scope>" + a chevron, opening an absolutely-positioned panel with "Select all"/"Clear" and month checkboxes grouped by year (`reportMonthsByYear`), scrollable (max-height 260px). No new React state (details handles open/close). `setReportMonths(null)`=all, `[]`=clear, `toggleReportMonth` per checkbox. Removed all `.month-chip*` CSS.
+- Trend chart: replaced the horizontal grouped bars with a VERTICAL list (`.trend-list`, max-height 360px, scrolls) — one row per month: label + two thin horizontal bars (income teal, spending coral) each with its amount. Scales to any month count. Removed `.trend-chart/.trend-col/.trend-bars/.trend-bar` CSS.
+
+Added `FaChevronDown` import. No data-helper changes (calculateMonthlyTrend unchanged), so the 82/5 tests still pass; build green (8.28s). Live-verified on dev server (8 months of real data): dropdown opens, year groups (2024/2025), 8 checkboxes, uncheck→"7 months"+7 trend rows, Clear→empty state, Select all→All months; trend list renders 8 vertical rows; no console errors. (Chrome screenshot tool hit a CDP clip.scale param bug — verified via DOM reads instead.) NOT committed (local on `main`, on top of the pushed b428733).
+
 ## 2026-06-21 22:22:23 - Reports page rebuilt: multi-month picker + 4 report cards (polished design)
 
 User wanted (1) to select any number of months in Reports, then (2) several reports instead of the single cashflow view, and (3) a less-basic design. Approved an inline mockup (teal income / coral spending, card layout) before building.

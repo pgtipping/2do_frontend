@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-06-22 02:50:08 - Whole app switched to a dark theme
+
+- Permanent dark mode (not a toggle) across the entire app, keeping the brand colors (green accent, teal income, coral spending) on layered dark surfaces.
+- All colors now come from one `:root` CSS-variable palette in `src/index.css` (surfaces, borders, text tiers, accent set, finance semantics, feedback states, shadows); `color-scheme: dark` + `html,body` dark background/margin reset added. `index.html` got a dark `theme-color`.
+- Rewrote `index.css`, `AuthGate.css`, and `FinanceImportScreen.css` to reference the palette; CSS only, no JSX/logic changes.
+- Verified: build green; live Chrome audit (signed in) of Import/Reports/Categories + the dropdown overlay, with a full-DOM scan finding 0 stray light surfaces. Local on `main`, not committed (stacked on the uncommitted month-picker/trend fix + hero copy change). Toggle would be a cheap follow-up.
+
+## 2026-06-22 02:20:22 - Reports month picker + trend chart now scale to many months
+
+- Month picker: horizontal chips → compact dropdown checklist (`<details>`), months grouped by year, Select all / Clear, scrollable. Scope label "Months · All months / N months / single".
+- Trend chart: horizontal grouped bars → vertical scrollable list (one row per month, income teal + spending coral horizontal bars with amounts). Both handle 24+ months.
+- No data-helper changes; 82 node + 5 vitest pass, build green. Live-verified all dropdown interactions + the vertical trend list on the dev server, no console errors. Local on `main` (on top of pushed b428733), not committed.
+
 ## 2026-06-21 22:22:23 - Reports page rebuilt (multi-month + 4 cards)
 
 - Reports now has its own multi-month chip picker (independent of the Ledger) with All months / Clear / per-month toggles and an empty state.

@@ -1,3 +1,68 @@
+/* Dark theme palette — single source of truth for the whole app. */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces — deep, green-tinted near-black, layered for depth */
+  --bg: #0c1310;
+  --bg-tint: rgba(46, 168, 118, 0.1);
+  --surface: #141d18;
+  --surface-2: #1b251f;
+  --surface-3: #232f28;
+  --surface-translucent: rgba(20, 29, 24, 0.82);
+  --field: #0f1713;
+
+  /* Borders */
+  --border: #2b3a32;
+  --border-soft: #233029;
+
+  /* Text */
+  --text: #e6eee9;
+  --text-strong: #f3f7f4;
+  --text-muted: #9cafa5;
+  --text-faint: #7f938a;
+
+  /* Brand green accent */
+  --accent: #2ea876;
+  --accent-strong: #36b681;
+  --on-accent: #06140e;
+  --accent-text: #57cfa0;
+  --accent-soft: rgba(46, 168, 118, 0.16);
+  --accent-ring: rgba(54, 182, 129, 0.28);
+  --primary: var(--accent); /* legacy alias */
+
+  /* Finance semantics */
+  --income: #3fcf97;
+  --income-text: #46d49d;
+  --spending: #f0815a;
+  --spending-text: #f1885f;
+
+  /* Feedback */
+  --success-text: #5fd6a6;
+  --success-bg: rgba(63, 207, 151, 0.12);
+  --success-border: rgba(63, 207, 151, 0.3);
+  --warning-text: #ecae54;
+  --warning-bg: rgba(233, 162, 60, 0.13);
+  --warning-border: rgba(233, 162, 60, 0.32);
+  --warning-accent: #e8932f;
+  --danger-text: #f3897a;
+  --danger-bg: rgba(224, 90, 74, 0.13);
+  --danger-border: rgba(224, 90, 74, 0.34);
+  --info-text: #74b8e6;
+  --info-bg: rgba(80, 150, 210, 0.13);
+
+  /* Shadows — heavier black for dark surfaces */
+  --shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.48);
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
 /* Add these new styles to your existing CSS */
 .similar-categories-modal {
   display: flex;
@@ -7,7 +72,7 @@
 
 .similar-categories-modal p {
   margin: 0;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .similar-categories-list {
@@ -17,7 +82,7 @@
 }
 
 .similar-category-button {
-  background: #f8fafc;
+  background: var(--surface-2);
   color: var(--text);
   text-align: left;
   padding: 0.75rem;
@@ -26,7 +91,7 @@
 }
 
 .similar-category-button:hover {
-  background: #e2e8f0;
+  background: var(--surface-3);
 }
 
 .create-anyway-button {
@@ -41,13 +106,14 @@
 
 /* Update existing modal styles */
 .modal-content {
-  background: white;
+  background: var(--surface);
+  border: 1px solid var(--border);
   padding: 1.5rem;
   border-radius: 8px;
   min-width: 300px;
   max-width: 500px;
   width: 90%;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-actions {

@@ -3,6 +3,7 @@ import {
   FaCalendarAlt,
   FaChartPie,
   FaCheck,
+  FaChevronDown,
   FaDownload,
   FaEdit,
   FaExclamationTriangle,
@@ -841,6 +842,12 @@ export default function FinanceImportScreen() {
       ? effectiveReportMonths[0]
       : `${effectiveReportMonths.length} months`;
 
+  const reportMonthsByYear = monthOptions.reduce((groups, month) => {
+    const year = month.slice(0, 4);
+    (groups[year] = groups[year] || []).push(month);
+    return groups;
+  }, {});
+
   const toggleReportMonth = (month) => {
     setReportMonths((current) => {
       const base = current ?? monthOptions;
@@ -871,7 +878,7 @@ export default function FinanceImportScreen() {
       <section className="finance-hero">
         <div>
           <p className="finance-kicker">Personal finance workspace</p>
-          <h1>Import, label, and understand your TD Bank activity.</h1>
+          <h1>Insights to your cashflow.</h1>
         </div>
         <div className="hero-actions">
           <button className="ghost-action" type="button" onClick={exportCsv}>
@@ -2034,36 +2041,47 @@ export default function FinanceImportScreen() {
       {activeTab === "reports" ? (
         <section className="reports-workspace">
           <div className="report-controls">
-            <div className="month-chip-row" aria-label="Select report months">
-              <button
-                type="button"
-                className={`month-chip ${reportAllMonthsSelected ? "active" : ""}`}
-                onClick={() => setReportMonths(null)}
-              >
-                All months
-              </button>
-              <button
-                type="button"
-                className="month-chip ghost"
-                onClick={() => setReportMonths([])}
-              >
-                Clear
-              </button>
-              <span className="chip-divider" aria-hidden="true" />
-              {monthOptions.map((month) => (
-                <button
-                  type="button"
-                  key={month}
-                  className={`month-chip ${
-                    effectiveReportMonths.includes(month) ? "active" : ""
-                  }`}
-                  aria-pressed={effectiveReportMonths.includes(month)}
-                  onClick={() => toggleReportMonth(month)}
-                >
-                  {month}
-                </button>
-              ))}
-            </div>
+            <details className="month-picker">
+              <summary className="month-picker-trigger">
+                <span>
+                  <span className="month-picker-label">Months</span>
+                  {reportScopeLabel}
+                </span>
+                <FaChevronDown aria-hidden="true" />
+              </summary>
+              <div className="month-picker-panel">
+                <div className="month-picker-actions">
+                  <button
+                    type="button"
+                    onClick={() => setReportMonths(null)}
+                  >
+                    Select all
+                  </button>
+                  <button type="button" onClick={() => setReportMonths([])}>
+                    Clear
+                  </button>
+                </div>
+                <div className="month-picker-list">
+                  {Object.entries(reportMonthsByYear)
+                    .sort((first, second) => first[0].localeCompare(second[0]))
+                    .map(([year, months]) => (
+                      <div className="month-picker-year" key={year}>
+                        <p className="month-picker-year-label">{year}</p>
+                        {months.map((month) => (
+                          <label className="month-picker-option" key={month}>
+                            <input
+                              type="checkbox"
+                              checked={effectiveReportMonths.includes(month)}
+                              onChange={() => toggleReportMonth(month)}
+                            />
+                            {month}
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </details>
             <label className="self-transfer-toggle">
               <input
                 checked={includeSelfTransfers}
@@ -2151,30 +2169,42 @@ export default function FinanceImportScreen() {
                     <span className="legend-key spending">Spending</span>
                   </div>
                 </div>
-                <div className="trend-chart" aria-label="Income vs spending by month">
+                <div className="trend-list" aria-label="Income vs spending by month">
                   {reportTrend.map((entry) => (
-                    <div className="trend-col" key={entry.month}>
-                      <div className="trend-bars">
-                        <div
-                          className="trend-bar income"
-                          style={{
-                            height: `${Math.round(
-                              (entry.income / reportTrendMax) * 100
-                            )}%`,
-                          }}
-                          title={`Income ${formatMoney(entry.income)}`}
-                        />
-                        <div
-                          className="trend-bar spending"
-                          style={{
-                            height: `${Math.round(
-                              (entry.expenses / reportTrendMax) * 100
-                            )}%`,
-                          }}
-                          title={`Spending ${formatMoney(entry.expenses)}`}
-                        />
+                    <div className="trend-row" key={entry.month}>
+                      <span className="trend-month">{entry.month}</span>
+                      <div className="trend-row-bars">
+                        <div className="trend-line">
+                          <div className="trend-track">
+                            <div
+                              className="trend-fill income"
+                              style={{
+                                width: `${Math.round(
+                                  (entry.income / reportTrendMax) * 100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="trend-amount">
+                            {formatMoney(entry.income)}
+                          </span>
+                        </div>
+                        <div className="trend-line">
+                          <div className="trend-track">
+                            <div
+                              className="trend-fill spending"
+                              style={{
+                                width: `${Math.round(
+                                  (entry.expenses / reportTrendMax) * 100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="trend-amount">
+                            {formatMoney(entry.expenses)}
+                          </span>
+                        </div>
                       </div>
-                      <span className="trend-label">{entry.month}</span>
                     </div>
                   ))}
                 </div>
