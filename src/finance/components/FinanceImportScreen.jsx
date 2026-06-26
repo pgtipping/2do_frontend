@@ -10,6 +10,7 @@ import {
   FaFileImport,
   FaListUl,
   FaSignOutAlt,
+  FaSpinner,
   FaTags,
   FaTimes,
   FaTrash,
@@ -35,8 +36,11 @@ import {
   calculateTopMerchants,
   filterTransactionsByMonths,
   getLargestTransactions,
+  isSpending,
   rankCategorySpending,
   sortTransactions,
+  spendingDelta,
+  transactionLabel,
 } from "../reports";
 import {
   createJsonBackup,
@@ -130,15 +134,19 @@ export default function FinanceImportScreen() {
   const [draft, setDraft] = useState(null);
   const [saveResult, setSaveResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [pdfStatus, setPdfStatus] = useState("");
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [financeData, setFinanceData] = useState(null);
   const [loadError, setLoadError] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState(ALL_MONTHS);
+  // null = all months selected; otherwise an explicit list of "YYYY-MM" keys.
+  const [ledgerMonths, setLedgerMonths] = useState(null);
   const [sortOrder, setSortOrder] = useState(DEFAULT_LEDGER_SORT);
   // null = all months selected; otherwise an explicit list of "YYYY-MM" keys.
   const [reportMonths, setReportMonths] = useState(null);
   const [includeSelfTransfers, setIncludeSelfTransfers] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [reportDetail, setReportDetail] = useState(null);
   const [editingTransactionId, setEditingTransactionId] = useState(null);
   const [transactionForm, setTransactionForm] = useState(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
@@ -163,7 +171,9 @@ export default function FinanceImportScreen() {
     defaultCategories,
     financeData?.categories || []
   );
-  const visibleCategories = categories.filter((category) => !category.archivedAt);
+  const visibleCategories = categories
+    .filter((category) => !category.archivedAt)
+    .sort((first, second) => first.name.localeCompare(second.name));
   const hiddenCategories = categories.filter((category) => category.archivedAt);
   const transactions = financeData?.transactions || [];
   const subscriptions = financeData?.subscriptions || [];
@@ -183,12 +193,18 @@ export default function FinanceImportScreen() {
       setFinanceData(hydratedData);
       setLoadError("");
 
-      if (
-        selectedMonth !== ALL_MONTHS &&
-        months.length > 0 &&
-        !months.includes(selectedMonth)
-      ) {
-        setSelectedMonth(ALL_MONTHS);
+      // Drop any explicitly-selected ledger months that no longer have data.
+      if (months.length > 0) {
+        setLedgerMonths((current) => {
+          if (current === null) {
+            return null;
+          }
+          const stillPresent = current.filter((month) => months.includes(month));
+          if (stillPresent.length === current.length) {
+            return current;
+          }
+          return stillPresent.length > 0 ? stillPresent : null;
+        });
       }
     } catch (error) {
       setLoadError(
@@ -202,6 +218,20 @@ export default function FinanceImportScreen() {
   useEffect(() => {
     loadFinanceData();
   }, []);
+
+  // Let Escape dismiss the report detail modal.
+  useEffect(() => {
+    if (!reportDetail) {
+      return undefined;
+    }
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setReportDetail(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reportDetail]);
 
   const parseStatement = () => {
     setErrorMessage("");
@@ -351,7 +381,7 @@ export default function FinanceImportScreen() {
   };
 
   const saveSelectedRows = async () => {
-    if (!draft) {
+    if (!draft || isSaving) {
       return;
     }
 
@@ -360,16 +390,30 @@ export default function FinanceImportScreen() {
       ...draft,
       rows: draft.rows.filter((row) => savedRowIds.has(row.id)),
     };
-    const result = await repository.saveReviewedImport(selectedDraft);
-    await loadFinanceData();
 
-    // Drop the just-saved rows from the review list; keep the rest (the locked
-    // uncategorized rows plus any categorized row left unchecked). Stay on the
-    // Import tab so the confirmation and the leftovers are visible.
-    const remainingRows = draft.rows.filter((row) => !savedRowIds.has(row.id));
-    setSelectedRows(new Set());
-    setSaveResult({ ...result, remainingCount: remainingRows.length });
-    setDraft(remainingRows.length > 0 ? { ...draft, rows: remainingRows } : null);
+    setSaveError("");
+    setIsSaving(true);
+
+    try {
+      const result = await repository.saveReviewedImport(selectedDraft);
+      await loadFinanceData();
+
+      // Drop the just-saved rows from the review list; keep the rest (the locked
+      // uncategorized rows plus any categorized row left unchecked). Stay on the
+      // Import tab so the confirmation and the leftovers are visible.
+      const remainingRows = draft.rows.filter((row) => !savedRowIds.has(row.id));
+      setSelectedRows(new Set());
+      setSaveResult({ ...result, remainingCount: remainingRows.length });
+      setDraft(remainingRows.length > 0 ? { ...draft, rows: remainingRows } : null);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Could not save the selected rows. Please try again."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const startEditingTransaction = (transaction) => {
@@ -794,8 +838,15 @@ export default function FinanceImportScreen() {
   const monthOptions = Array.from(
     new Set(transactions.map((transaction) => getMonthKey(transaction.date)))
   ).sort();
-  const monthSummary = calculateMonthlySummary(transactions, {
-    month: selectedMonth,
+
+  // The Ledger can show one, several, or all months. null = all.
+  const effectiveLedgerMonths = ledgerMonths ?? monthOptions;
+  const ledgerTransactions = filterTransactionsByMonths(
+    transactions,
+    effectiveLedgerMonths
+  );
+  const monthSummary = calculateMonthlySummary(ledgerTransactions, {
+    month: ALL_MONTHS,
     includeSelfTransfers,
   });
   const categoryById = new Map(
@@ -842,7 +893,8 @@ export default function FinanceImportScreen() {
       ? effectiveReportMonths[0]
       : `${effectiveReportMonths.length} months`;
 
-  const reportMonthsByYear = monthOptions.reduce((groups, month) => {
+  // Shared by both month pickers (Ledger + Reports): months grouped by year.
+  const monthsByYear = monthOptions.reduce((groups, month) => {
     const year = month.slice(0, 4);
     (groups[year] = groups[year] || []).push(month);
     return groups;
@@ -856,19 +908,198 @@ export default function FinanceImportScreen() {
         : [...base, month].sort();
     });
   };
-  const monthTransactions = sortTransactions(
-    transactions.filter((transaction) =>
-      selectedMonth === ALL_MONTHS
-        ? true
-        : getMonthKey(transaction.date) === selectedMonth
-    ),
-    sortOrder,
-    { categoryById }
-  );
-  const getSelectableCategories = (selectedCategoryId) =>
-    categories.filter(
-      (category) => !category.archivedAt || category.id === selectedCategoryId
+
+  const ledgerAllMonthsSelected =
+    ledgerMonths === null ||
+    (monthOptions.length > 0 &&
+      effectiveLedgerMonths.length === monthOptions.length);
+  const ledgerScopeLabel = ledgerAllMonthsSelected
+    ? "All months"
+    : effectiveLedgerMonths.length === 1
+      ? effectiveLedgerMonths[0]
+      : `${effectiveLedgerMonths.length} months`;
+
+  const toggleLedgerMonth = (month) => {
+    setLedgerMonths((current) => {
+      const base = current ?? monthOptions;
+      return base.includes(month)
+        ? base.filter((entry) => entry !== month)
+        : [...base, month].sort();
+    });
+  };
+
+  // Shared props that make a non-button element behave like a button: click,
+  // keyboard (Enter/Space), and focusability for the report drill-downs.
+  const clickableProps = (onActivate) => ({
+    role: "button",
+    tabIndex: 0,
+    onClick: onActivate,
+    onKeyDown: (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onActivate();
+      }
+    },
+  });
+
+  const sortByMagnitude = (list) =>
+    [...list].sort((first, second) => Math.abs(second.amount) - Math.abs(first.amount));
+
+  const sumMagnitude = (list) =>
+    list.reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+
+  // Net spending for a set of transactions (expenses add, refunds subtract),
+  // so the drill-down totals match the cards.
+  const sumSpending = (list) =>
+    list.reduce(
+      (total, transaction) => total + spendingDelta(transaction, includeSelfTransfers),
+      0
     );
+
+  const openCategoryDetail = (categoryId) => {
+    const transactionsForCategory = sortByMagnitude(
+      reportTransactions.filter(
+        (transaction) =>
+          isSpending(transaction, includeSelfTransfers) &&
+          (transaction.categoryId || "uncategorized") === categoryId
+      )
+    );
+    setReportDetail({
+      title: categoryById.get(categoryId)?.name || "Uncategorized",
+      subtitle: `Spending · ${reportScopeLabel}`,
+      summary: [
+        { label: "Total spending", value: formatMoney(sumSpending(transactionsForCategory)), tone: "out" },
+        { label: "Transactions", value: String(transactionsForCategory.length) },
+      ],
+      transactions: transactionsForCategory,
+    });
+  };
+
+  const openMerchantDetail = (label) => {
+    const transactionsForMerchant = sortByMagnitude(
+      reportTransactions.filter(
+        (transaction) =>
+          isSpending(transaction, includeSelfTransfers) &&
+          transactionLabel(transaction) === label
+      )
+    );
+    setReportDetail({
+      title: label,
+      subtitle: `Spending · ${reportScopeLabel}`,
+      summary: [
+        { label: "Total spending", value: formatMoney(sumSpending(transactionsForMerchant)), tone: "out" },
+        { label: "Transactions", value: String(transactionsForMerchant.length) },
+      ],
+      transactions: transactionsForMerchant,
+    });
+  };
+
+  const openTransactionDetail = (transaction) => {
+    setReportDetail({
+      title: transaction.merchant || transaction.description,
+      subtitle: `${transaction.date} · ${formatType(transaction.type)}`,
+      summary: [
+        {
+          label: "Amount",
+          value: formatMoney(transaction.amount),
+          tone: transaction.amount >= 0 ? "in" : "out",
+        },
+        {
+          label: "Category",
+          value: categoryById.get(transaction.categoryId)?.name || "Uncategorized",
+        },
+      ],
+      transactions: [transaction],
+    });
+  };
+
+  const openMonthDetail = (month) => {
+    const transactionsForMonth = sortByMagnitude(
+      filterTransactionsByMonths(reportTransactions, [month])
+    );
+    const income = sumMagnitude(
+      transactionsForMonth.filter((transaction) => transaction.type === "income")
+    );
+    const spending = sumSpending(transactionsForMonth);
+    setReportDetail({
+      title: month,
+      subtitle: "Income vs spending",
+      summary: [
+        { label: "Income", value: formatMoney(income), tone: "in" },
+        { label: "Spending", value: formatMoney(spending), tone: "out" },
+        { label: "Net", value: formatMoney(income - spending) },
+        { label: "Transactions", value: String(transactionsForMonth.length) },
+      ],
+      transactions: transactionsForMonth,
+    });
+  };
+
+  const openSummaryDetail = (kind) => {
+    if (kind === "net") {
+      const transactionsForNet = sortByMagnitude(
+        reportTransactions.filter(
+          (transaction) =>
+            transaction.type === "income" ||
+            isSpending(transaction, includeSelfTransfers)
+        )
+      );
+      setReportDetail({
+        title: "Left over",
+        subtitle: `Income minus spending · ${reportScopeLabel}`,
+        summary: [
+          { label: "Income", value: formatMoney(reportSummary.income), tone: "in" },
+          { label: "Spending", value: formatMoney(reportSummary.expenses), tone: "out" },
+          { label: "Left over", value: formatMoney(reportSummary.net) },
+        ],
+        transactions: transactionsForNet,
+      });
+      return;
+    }
+
+    const config = {
+      income: {
+        title: "Income",
+        tone: "in",
+        total: reportSummary.income,
+        filter: (transaction) => transaction.type === "income",
+      },
+      spending: {
+        title: "Spending",
+        tone: "out",
+        total: reportSummary.expenses,
+        filter: (transaction) => isSpending(transaction, includeSelfTransfers),
+      },
+      selfTransfers: {
+        title: "Self-transfers",
+        tone: null,
+        total: reportSummary.selfTransfers,
+        filter: (transaction) => transaction.type === "transfer_to_self",
+      },
+    }[kind];
+
+    const transactionsForTile = sortByMagnitude(
+      reportTransactions.filter(config.filter)
+    );
+    setReportDetail({
+      title: config.title,
+      subtitle: reportScopeLabel,
+      summary: [
+        { label: `Total ${config.title.toLowerCase()}`, value: formatMoney(config.total), tone: config.tone },
+        { label: "Transactions", value: String(transactionsForTile.length) },
+      ],
+      transactions: transactionsForTile,
+    });
+  };
+
+  const monthTransactions = sortTransactions(ledgerTransactions, sortOrder, {
+    categoryById,
+  });
+  const getSelectableCategories = (selectedCategoryId) =>
+    categories
+      .filter(
+        (category) => !category.archivedAt || category.id === selectedCategoryId
+      )
+      .sort((first, second) => first.name.localeCompare(second.name));
   const sortedSubscriptions = [...subscriptions].sort((first, second) =>
     first.nextRenewalDate.localeCompare(second.nextRenewalDate)
   );
@@ -1013,12 +1244,27 @@ export default function FinanceImportScreen() {
               className="primary-action compact"
               type="button"
               onClick={saveSelectedRows}
-              disabled={!draft || selectedCount === 0}
+              disabled={!draft || selectedCount === 0 || isSaving}
             >
-              <FaCheck aria-hidden="true" />
-              Save Selected
+              {isSaving ? (
+                <>
+                  <FaSpinner className="btn-spinner" aria-hidden="true" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <FaCheck aria-hidden="true" />
+                  Save Selected
+                </>
+              )}
             </button>
           </div>
+
+          {saveError ? (
+            <p className="error-message" role="alert">
+              {saveError}
+            </p>
+          ) : null}
 
           {saveSummary ? (
             <div
@@ -1172,9 +1418,9 @@ export default function FinanceImportScreen() {
             <div>
               <p className="eyebrow">Ledger</p>
               <h2>
-                {selectedMonth === ALL_MONTHS
+                {ledgerAllMonthsSelected
                   ? `${monthTransactions.length} saved transactions`
-                  : `${selectedMonth} transactions`}
+                  : `${ledgerScopeLabel} · ${monthTransactions.length} transactions`}
               </h2>
             </div>
             <div className="ledger-heading-actions">
@@ -1186,22 +1432,44 @@ export default function FinanceImportScreen() {
               >
                 Find duplicates
               </button>
-              <select
-                className="month-select"
-                aria-label="Select ledger month"
-                value={selectedMonth}
-                onChange={(event) => setSelectedMonth(event.target.value)}
-              >
-                <option value={ALL_MONTHS}>All months</option>
-                {[selectedMonth, ...monthOptions]
-                  .filter((month) => month && month !== ALL_MONTHS)
-                  .filter((month, index, months) => months.indexOf(month) === index)
-                  .map((month) => (
-                    <option key={month} value={month}>
-                      {month}
-                    </option>
-                  ))}
-              </select>
+              <details className="month-picker align-end">
+                <summary className="month-picker-trigger">
+                  <span>
+                    <span className="month-picker-label">Months</span>
+                    {ledgerScopeLabel}
+                  </span>
+                  <FaChevronDown aria-hidden="true" />
+                </summary>
+                <div className="month-picker-panel">
+                  <div className="month-picker-actions">
+                    <button type="button" onClick={() => setLedgerMonths(null)}>
+                      Select all
+                    </button>
+                    <button type="button" onClick={() => setLedgerMonths([])}>
+                      Clear
+                    </button>
+                  </div>
+                  <div className="month-picker-list">
+                    {Object.entries(monthsByYear)
+                      .sort((first, second) => first[0].localeCompare(second[0]))
+                      .map(([year, months]) => (
+                        <div className="month-picker-year" key={year}>
+                          <p className="month-picker-year-label">{year}</p>
+                          {months.map((month) => (
+                            <label className="month-picker-option" key={month}>
+                              <input
+                                type="checkbox"
+                                checked={effectiveLedgerMonths.includes(month)}
+                                onChange={() => toggleLedgerMonth(month)}
+                              />
+                              {month}
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </details>
               <select
                 className="month-select"
                 aria-label="Sort transactions"
@@ -1353,6 +1621,7 @@ export default function FinanceImportScreen() {
                             >
                               <option value="income">Income</option>
                               <option value="expense">Expense</option>
+                              <option value="refund">Refund</option>
                               <option value="transfer_to_other">
                                 Transfer to other
                               </option>
@@ -2062,7 +2331,7 @@ export default function FinanceImportScreen() {
                   </button>
                 </div>
                 <div className="month-picker-list">
-                  {Object.entries(reportMonthsByYear)
+                  {Object.entries(monthsByYear)
                     .sort((first, second) => first[0].localeCompare(second[0]))
                     .map(([year, months]) => (
                       <div className="month-picker-year" key={year}>
@@ -2104,19 +2373,31 @@ export default function FinanceImportScreen() {
                   <span className="report-scope">{reportScopeLabel}</span>
                 </div>
                 <div className="cash-summary-grid">
-                  <div className="stat-tile income">
+                  <div
+                    className="stat-tile income report-clickable"
+                    {...clickableProps(() => openSummaryDetail("income"))}
+                  >
                     <span>Income</span>
                     <strong>{formatMoney(reportSummary.income)}</strong>
                   </div>
-                  <div className="stat-tile spending">
+                  <div
+                    className="stat-tile spending report-clickable"
+                    {...clickableProps(() => openSummaryDetail("spending"))}
+                  >
                     <span>Spending</span>
                     <strong>{formatMoney(reportSummary.expenses)}</strong>
                   </div>
-                  <div className="stat-tile">
+                  <div
+                    className="stat-tile report-clickable"
+                    {...clickableProps(() => openSummaryDetail("net"))}
+                  >
                     <span>Left over</span>
                     <strong>{formatMoney(reportSummary.net)}</strong>
                   </div>
-                  <div className="stat-tile">
+                  <div
+                    className="stat-tile report-clickable"
+                    {...clickableProps(() => openSummaryDetail("selfTransfers"))}
+                  >
                     <span>Self-transfers</span>
                     <strong>{formatMoney(reportSummary.selfTransfers)}</strong>
                   </div>
@@ -2136,7 +2417,11 @@ export default function FinanceImportScreen() {
                 {reportCategories.length > 0 ? (
                   <div className="category-bars">
                     {reportCategories.map((entry) => (
-                      <div className="category-bar-row" key={entry.categoryId}>
+                      <div
+                        className="category-bar-row report-clickable"
+                        key={entry.categoryId}
+                        {...clickableProps(() => openCategoryDetail(entry.categoryId))}
+                      >
                         <div className="category-bar-head">
                           <span>
                             {categoryById.get(entry.categoryId)?.name ||
@@ -2171,7 +2456,11 @@ export default function FinanceImportScreen() {
                 </div>
                 <div className="trend-list" aria-label="Income vs spending by month">
                   {reportTrend.map((entry) => (
-                    <div className="trend-row" key={entry.month}>
+                    <div
+                      className="trend-row report-clickable"
+                      key={entry.month}
+                      {...clickableProps(() => openMonthDetail(entry.month))}
+                    >
                       <span className="trend-month">{entry.month}</span>
                       <div className="trend-row-bars">
                         <div className="trend-line">
@@ -2217,7 +2506,11 @@ export default function FinanceImportScreen() {
                     <p className="eyebrow">Top merchants</p>
                     {reportTopMerchants.length > 0 ? (
                       reportTopMerchants.map((entry) => (
-                        <div className="report-list-row" key={entry.merchant}>
+                        <div
+                          className="report-list-row report-clickable"
+                          key={entry.merchant}
+                          {...clickableProps(() => openMerchantDetail(entry.merchant))}
+                        >
                           <span className="label">
                             <span>{entry.merchant}</span>
                           </span>
@@ -2232,7 +2525,11 @@ export default function FinanceImportScreen() {
                     <p className="eyebrow">Largest transactions</p>
                     {reportLargest.length > 0 ? (
                       reportLargest.map((transaction) => (
-                        <div className="report-list-row" key={transaction.id}>
+                        <div
+                          className="report-list-row report-clickable"
+                          key={transaction.id}
+                          {...clickableProps(() => openTransactionDetail(transaction))}
+                        >
                           <span className="label">
                             <span>
                               {transaction.merchant || transaction.description}
@@ -2257,6 +2554,86 @@ export default function FinanceImportScreen() {
             </div>
           )}
         </section>
+      ) : null}
+
+      {reportDetail ? (
+        <div
+          className="report-modal-overlay"
+          role="presentation"
+          onClick={() => setReportDetail(null)}
+        >
+          <div
+            className="report-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={reportDetail.title}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="report-modal-head">
+              <div className="report-modal-titles">
+                <h3>{reportDetail.title}</h3>
+                {reportDetail.subtitle ? (
+                  <p>{reportDetail.subtitle}</p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="report-modal-close"
+                onClick={() => setReportDetail(null)}
+                aria-label="Close details"
+              >
+                <FaTimes aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="report-modal-summary">
+              {reportDetail.summary.map((item) => (
+                <div className="stat-tile" key={item.label}>
+                  <span>{item.label}</span>
+                  <strong
+                    className={
+                      item.tone === "in"
+                        ? "amount-in"
+                        : item.tone === "out"
+                          ? "amount-out"
+                          : undefined
+                    }
+                  >
+                    {item.value}
+                  </strong>
+                </div>
+              ))}
+            </div>
+
+            <div className="report-modal-list">
+              {reportDetail.transactions.length > 0 ? (
+                reportDetail.transactions.map((transaction) => (
+                  <div className="report-modal-row" key={transaction.id}>
+                    <span className="label">
+                      <span>
+                        {transaction.merchant || transaction.description}
+                      </span>
+                      <small>
+                        {transaction.date} ·{" "}
+                        {categoryById.get(transaction.categoryId)?.name ||
+                          "Uncategorized"}
+                      </small>
+                    </span>
+                    <strong
+                      className={
+                        transaction.amount >= 0 ? "amount-in" : "amount-out"
+                      }
+                    >
+                      {formatMoney(transaction.amount)}
+                    </strong>
+                  </div>
+                ))
+              ) : (
+                <p className="muted-copy">No matching transactions.</p>
+              )}
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );

@@ -15,16 +15,29 @@ function isInMonth(transaction, month) {
   return getMonthKey(transaction.date) === month;
 }
 
-// "Spending" = money leaving for expenses or transfers to others. Transfers
+// "Spending" = money leaving for expenses or transfers to others, offset by
+// refunds (money returned for a cancelled purchase or returned item). Transfers
 // between the user's own accounts only count when includeSelfTransfers is on.
-function isSpending(transaction, includeSelfTransfers = false) {
-  if (transaction.type === "expense" || transaction.type === "transfer_to_other") {
+export function isSpending(transaction, includeSelfTransfers = false) {
+  const { type } = transaction;
+  if (type === "expense" || type === "transfer_to_other" || type === "refund") {
     return true;
   }
-  return includeSelfTransfers && transaction.type === "transfer_to_self";
+  return includeSelfTransfers && type === "transfer_to_self";
 }
 
-function transactionLabel(transaction) {
+// A transaction's signed contribution to spending. Expenses and transfers-out
+// add to spending; a refund subtracts from it (the money came back); everything
+// else contributes nothing.
+export function spendingDelta(transaction, includeSelfTransfers = false) {
+  if (!isSpending(transaction, includeSelfTransfers)) {
+    return 0;
+  }
+  const magnitude = absoluteAmount(transaction.amount);
+  return transaction.type === "refund" ? -magnitude : magnitude;
+}
+
+export function transactionLabel(transaction) {
   const label = (transaction.merchant || transaction.description || "").trim();
   return label || "Unknown";
 }
@@ -52,13 +65,8 @@ export function calculateMonthlySummary(
           summary.income += amount;
         }
 
-        if (
-          transaction.type === "expense" ||
-          transaction.type === "transfer_to_other" ||
-          (includeSelfTransfers && transaction.type === "transfer_to_self")
-        ) {
-          summary.expenses += amount;
-        }
+        // Expenses + transfers-out add, refunds subtract (see spendingDelta).
+        summary.expenses += spendingDelta(transaction, includeSelfTransfers);
 
         if (transaction.type === "transfer_to_self") {
           summary.selfTransfers += amount;
@@ -86,7 +94,8 @@ export function calculateCategorySpending(
     .filter((transaction) => isSpending(transaction, includeSelfTransfers))
     .reduce((totals, transaction) => {
       const categoryId = transaction.categoryId || "uncategorized";
-      totals[categoryId] = (totals[categoryId] || 0) + absoluteAmount(transaction.amount);
+      totals[categoryId] =
+        (totals[categoryId] || 0) + spendingDelta(transaction, includeSelfTransfers);
       return totals;
     }, {});
 }
@@ -116,7 +125,10 @@ export function calculateTopMerchants(
     .filter((transaction) => isSpending(transaction, includeSelfTransfers))
     .forEach((transaction) => {
       const label = transactionLabel(transaction);
-      totals.set(label, (totals.get(label) || 0) + absoluteAmount(transaction.amount));
+      totals.set(
+        label,
+        (totals.get(label) || 0) + spendingDelta(transaction, includeSelfTransfers)
+      );
     });
 
   return Array.from(totals.entries())
@@ -211,8 +223,9 @@ export const LEDGER_SORT_GROUPS = [
 const TYPE_SORT_ORDER = {
   income: 0,
   expense: 1,
-  transfer_to_other: 2,
-  transfer_to_self: 3,
+  refund: 2,
+  transfer_to_other: 3,
+  transfer_to_self: 4,
 };
 
 function transactionNameKey(transaction) {

@@ -148,6 +148,18 @@ function classifyTransaction(section, narration) {
   }
 
   if (section === "Deposits" || section === "Electronic Deposits") {
+    // PayPal / ACH transfer deposits are ambiguous: they can be real income or
+    // a refund for a cancelled purchase or returned item. Default to income but
+    // flag for review so the user can switch it to Refund when it isn't earnings.
+    if (compactNarration.includes("PAYPALTRANSFER")) {
+      return {
+        type: "income",
+        counterpartyType: "external_account",
+        confidence: "low",
+        needsReview: true,
+      };
+    }
+
     return {
       type: "income",
       counterpartyType: "external_account",

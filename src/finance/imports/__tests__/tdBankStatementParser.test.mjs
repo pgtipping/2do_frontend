@@ -406,3 +406,31 @@ Subtotal: 100.00
     },
   ]);
 });
+
+test("flags PayPal transfer deposits for review (income vs refund is ambiguous)", () => {
+  const statementText = `
+Page: 1 of 1
+Statement Period: Mar 04 2025-Apr 03 2025
+Primary Account #: xxx-xxx8531
+Account Product Label: TD Convenience Checking
+
+Daily Account Activity
+Electronic Deposits
+POSTING DATE DESCRIPTION AMOUNT
+03/15 ACH DEPOSIT, PAYPAL TRANSFER ****785060586 120.00
+Subtotal: 120.00
+
+How to Balance your Account
+This section is informational and should not become a transaction.
+`;
+  const result = parseTdBankStatementText(statementText);
+  const paypal = result.transactions.find((transaction) =>
+    transaction.rawNarration.replace(/\s+/g, "").toUpperCase().includes("PAYPALTRANSFER")
+  );
+
+  assert.ok(paypal, "expected the PayPal transfer deposit to be parsed");
+  assert.equal(paypal.amount, 120);
+  assert.equal(paypal.type, "income");
+  assert.equal(paypal.needsReview, true);
+  assert.equal(paypal.confidence, "low");
+});

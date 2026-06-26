@@ -12,8 +12,11 @@ import {
   filterTransactionsByMonths,
   getLargestTransactions,
   getUpcomingSubscriptions,
+  isSpending,
   rankCategorySpending,
   sortTransactions,
+  spendingDelta,
+  transactionLabel,
 } from "../reports.js";
 
 const transactions = [
@@ -308,4 +311,54 @@ test("monthly trend reports income and spending per month, oldest first", () => 
     calculateMonthlyTrend(reportRows, ["2025-02"], { includeSelfTransfers: true }),
     [{ month: "2025-02", income: 3000, expenses: 300 }]
   );
+});
+
+test("isSpending counts expenses, transfers-to-others, and refunds, not income or self-transfers", () => {
+  assert.equal(isSpending({ type: "expense" }), true);
+  assert.equal(isSpending({ type: "transfer_to_other" }), true);
+  assert.equal(isSpending({ type: "refund" }), true);
+  assert.equal(isSpending({ type: "income" }), false);
+  assert.equal(isSpending({ type: "transfer_to_self" }), false);
+  assert.equal(isSpending({ type: "transfer_to_self" }, true), true);
+});
+
+test("spendingDelta adds expenses, subtracts refunds, ignores income", () => {
+  assert.equal(spendingDelta({ type: "expense", amount: -40 }), 40);
+  assert.equal(spendingDelta({ type: "transfer_to_other", amount: -75 }), 75);
+  assert.equal(spendingDelta({ type: "refund", amount: 30 }), -30);
+  assert.equal(spendingDelta({ type: "income", amount: 2500 }), 0);
+  assert.equal(spendingDelta({ type: "transfer_to_self", amount: -300 }), 0);
+  assert.equal(spendingDelta({ type: "transfer_to_self", amount: -300 }, true), 300);
+});
+
+test("a refund reduces spending and never counts as income", () => {
+  const rows = [
+    { date: "2025-03-01", amount: -100, type: "expense", categoryId: "cat_shopping" },
+    { date: "2025-03-05", amount: 30, type: "refund", categoryId: "cat_shopping" },
+    { date: "2025-03-08", amount: 2000, type: "income", categoryId: "cat_income" },
+  ];
+  const summary = calculateMonthlySummary(rows, { month: "2025-03" });
+  assert.equal(summary.income, 2000); // refund does not inflate income
+  assert.equal(summary.expenses, 70); // 100 spent minus 30 returned
+  assert.equal(summary.net, 1930);
+});
+
+test("a refund nets against its category and merchant totals", () => {
+  const rows = [
+    { date: "2025-03-01", amount: -100, type: "expense", categoryId: "cat_shopping", merchant: "Acme" },
+    { date: "2025-03-05", amount: 30, type: "refund", categoryId: "cat_shopping", merchant: "Acme" },
+  ];
+  assert.deepEqual(calculateCategorySpending(rows, { month: "2025-03" }), {
+    cat_shopping: 70,
+  });
+  assert.deepEqual(calculateTopMerchants(rows), [{ merchant: "Acme", total: 70 }]);
+});
+
+test("transactionLabel prefers merchant, falls back to description, then Unknown", () => {
+  assert.equal(
+    transactionLabel({ merchant: "Walmart", description: "WALMART STORE 42" }),
+    "Walmart"
+  );
+  assert.equal(transactionLabel({ description: "RENT PAYMENT" }), "RENT PAYMENT");
+  assert.equal(transactionLabel({}), "Unknown");
 });

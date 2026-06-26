@@ -1,5 +1,65 @@
 # Active Context
 
+## 2026-06-25 19:22:00 - Ledger gains multi-month selection (mirrors Reports)
+
+User asked for the ability to select multiple months in the Ledger. Replaced the Ledger's single-month `<select>` with the same dropdown checklist the Reports page already uses.
+
+State: removed `selectedMonth` (single string, default ALL_MONTHS); added `ledgerMonths` (null = all months, else an explicit ["YYYY-MM"] list) — identical model to `reportMonths`. New derivations mirror the report ones: `effectiveLedgerMonths = ledgerMonths ?? monthOptions`, `ledgerTransactions = filterTransactionsByMonths(transactions, effectiveLedgerMonths)`, `ledgerAllMonthsSelected`, `ledgerScopeLabel` (All months / single "YYYY-MM" / "N months"), `toggleLedgerMonth`. `monthSummary` now aggregates over `ledgerTransactions` with `month: ALL_MONTHS` (was per-single-month); `monthTransactions = sortTransactions(ledgerTransactions, sortOrder, {categoryById})`. Renamed `reportMonthsByYear` → `monthsByYear` (shared by both pickers).
+
+UI: the Ledger heading actions now render a `<details className="month-picker align-end">` checklist (Select all / Clear + month checkboxes grouped by year) instead of the single `<select>`. New CSS `.month-picker.align-end .month-picker-panel { left:auto; right:0 }` so the panel opens leftward (the Ledger trigger sits at the right edge via justify-content:flex-end, unlike the Reports picker on the left). Heading h2 now reads "N saved transactions" for all-months or "<scope> · N transactions" for a subset. loadFinanceData now prunes any selected ledger months that no longer have data (functional setLedgerMonths update; returns same ref when unchanged).
+
+No new pure logic — reuses the already-tested filterTransactionsByMonths + calculateMonthlySummary, and the month-picker pattern already verified live on Reports. Build green (3.89s; bundles index-ab0da8e1.css / index-d8adb2aa.js). 88 node + 5 vitest still pass. Confirmed zero remaining `selectedMonth` / `reportMonthsByYear` references; all new vars defined (build is esbuild, no type-check, so checked by hand).
+
+LIVE-VERIFIED in Chrome (real data, read-only) once the integration reconnected: picker present with 11 months all-checked by default ("All months", 478 tx). Clear → "0 months · 0 transactions" / $0. One month (2025-10) → "2025-10 · 4 transactions", spending $1,701.02. Two months (2025-09+10) → "2 months · 55 transactions", income $3,311.72 / spending $5,006.43 (correctly > either alone). Select all → back to 478. Row count always matched the heading; summary recomputed per selection. Minor: clearing all shows an empty table with no explicit empty-state message (edge case; "Select all" restores). NOT committed (local on `main`, stacked on the 06-25 Refund + modal + 06-24 work, on top of pushed 8108fd2); push only on user signal.
+
+## 2026-06-25 18:08:17 - New "Refund" transaction type + PayPal deposits flagged for review
+
+User hit the second ambiguous-deposit case: "ACH DEPOSIT, PAYPAL TRANSFER ****785060586" imports as income, but it could be a refund for a returned/cancelled purchase. A refund is neither income (would inflate earnings) nor a normal expense (the math sums absolute values, so it would ADD to spending) nor transfer_to_self (would leave spending overstated). Correct accounting: a refund REDUCES spending and never counts as income. So we added a real 5th type with defined math (the sanctioned exception to "no custom types" — custom types are refused only because they'd have no defined money behavior; refund has one).
+
+reports.js:
+- `isSpending` now also returns true for `refund` (it participates in spending, negatively).
+- New exported `spendingDelta(transaction, includeSelfTransfers)` = signed contribution to spending: expense/transfer_to_other → +magnitude, refund → −magnitude, self → +magnitude only when included, income/else → 0. This is the single source of the refund sign.
+- `calculateMonthlySummary` (and therefore `calculateMonthlyTrend`, which calls it), `calculateCategorySpending`/`rankCategorySpending`, and `calculateTopMerchants` all now use `spendingDelta` so refunds net against total spending, the category total, and the merchant total. Income is untouched. Net = income − (spending − refunds).
+- `TYPE_SORT_ORDER` gains `refund: 2` (income 0, expense 1, refund 2, transfer_to_other 3, transfer_to_self 4).
+
+Parser (tdBankStatementParser.js `classifyTransaction`): inside the Deposits/Electronic Deposits branch, a narration containing `PAYPALTRANSFER` now returns income + confidence "low" + needsReview TRUE (was silently income). Per the user's call: do NOT auto-map PayPal to refund (some may be real income) — flag for review so they pick. `reviewedImportDraft.js` turns needsReview/low-confidence into the "Needs review" row badge + reasons, so it shows in Import Review. Non-PayPal deposits unchanged (still income, medium, not flagged).
+
+Component (FinanceImportScreen.jsx): added `<option value="refund">Refund</option>` to the Ledger edit Type dropdown (between Expense and Transfer to other). Imported `spendingDelta`; the report drill-down modal's spending totals (category, merchant, month) now use a `sumSpending` helper (net of refunds) so they match the cards. NOTE: type editing is Ledger-only — the import review flags the PayPal row but the user sets the actual type (Income vs Refund) in the Ledger after saving.
+
+Tests: reports.test.mjs +3 (spendingDelta values; refund reduces spending & not income; refund nets category+merchant); tdBankStatementParser.test.mjs +1 (PayPal deposit → income/low/needsReview). Build green (3.43s; js bundle index-3cf5a8ca.js). 88 node (was 84) + 5 vitest pass. Live in Chrome: Ledger edit Type dropdown shows Income/Expense/Refund/Transfer to other/Transfer to self; cancelled the edit without saving (refund math itself is unit-tested, not exercised live, to avoid writing a real refund to the Supabase ledger). NOT committed (local on `main`, stacked on the 06-25 modal + 06-24 spinner/A–Z work, on top of pushed 8108fd2); push only on user signal.
+
+NOT done (user scoped it out for now): auto-classifying PayPal as refund (kept as review instead); also offered but not built — making the importer stop silently calling other ambiguous ACH deposits "income". The external-savings transfer auto-classification (transfer_to_self importer rule) is still open too.
+
+## 2026-06-25 17:06:48 - Clickable report drill-down modal
+
+Every Reports section is now clickable and opens a dismissible detail modal (summary + transaction list). User-approved scope (AskUserQuestion): all four cards clickable, content = "Summary + transaction list".
+
+Clickable elements and what each opens:
+- Cash summary tiles: Income / Spending / Left over / Self-transfers (Savings rate is NOT clickable — it's a derived %, no transaction list). Income tile → income-type txns; Spending → isSpending txns; Self-transfers → transfer_to_self txns; Left over → income+spending txns with an income/spending/net summary.
+- Spending by category bar → that category's spending txns.
+- Income vs spending trend row → that month's txns with income/spending/net summary.
+- Where the money went: a Top-merchants row → that merchant's spending txns; a Largest-transactions row → that single transaction's detail.
+
+Implementation (FinanceImportScreen.jsx + .css; reports.js + reports.test.mjs):
+- Exported `isSpending` and `transactionLabel` from `reports.js` (were private) so the drill-down filters reuse the EXACT income/spending logic the cards use — no divergence. Added 2 unit tests for them.
+- New `reportDetail` state holds `{title, subtitle, summary:[{label,value,tone}], transactions:[]}`. Builder helpers (openCategoryDetail / openMerchantDetail / openTransactionDetail / openMonthDetail / openSummaryDetail) filter `reportTransactions` and sort by magnitude desc. Modal renders summary as stat-tiles + a scrollable transaction list (date · category, signed amount).
+- Clickability via a shared `clickableProps(onActivate)` helper (role=button, tabIndex 0, click + Enter/Space) applied to existing divs — avoided converting styled divs to <button> to dodge button-default-style conflicts. `.report-clickable` adds cursor/hover(surface-3)/focus-visible outline.
+- Dismiss: overlay click, close (X) button, and Escape (useEffect keydown listener while open). Modal has fade/rise entrance animations (disabled under prefers-reduced-motion). role=dialog, aria-modal, aria-label.
+
+Verified: build green (5.74s; bundles index-a3778b7b.css / index-7b41bb5d.js). 84 node (+2 new) + 5 vitest pass (reports.js change was export-only; vitest covers the unrelated supabase driver). Live in Chrome against real data: clicked a category (Housing → 15 txns, $13,200), Income tile (35 txns, $19,598.10), a trend month (2024-12 → income/spending/net, 78 txns), a merchant (1 txn), and a largest transaction (single-tx detail) — all opened correct summaries + lists; Esc, overlay-click, and X all dismissed. Read-only (no writes). NOT committed (local on `main`, stacked on the uncommitted 06-24 spinner + A–Z sort work, on top of pushed 8108fd2); push only on user signal.
+
+OPEN (user deciding): how to handle external-savings transfers that import as income (inflow) / expense (outflow) instead of transfer_to_self — see the 06-25 note in this file / parser at tdBankStatementParser.js classifyTransaction. The new modal makes this easy to spot (the Income drill-down is full of "TD ZELLE RECEIVED" rows). Options given: retype each in the Ledger, or I add narration-pattern auto-classification on import (awaiting the row text).
+
+## 2026-06-24 13:05:38 - Save-in-progress spinner + A–Z category lists
+
+Two small UX fixes (both in `FinanceImportScreen.jsx`, plus a spinner keyframe in `.css`):
+
+1. Save feedback: "Save Selected" felt unresponsive because the Supabase save + reload take a beat with no signal. Added an `isSaving` state — while saving, the button shows an animated spinner (`FaSpinner` + a CSS `finance-spin` keyframe, 0.7s linear infinite) and the label "Saving…", and is disabled (also guards against double-click). Deliberately CSS animation, NOT framer-motion (that dep was removed in the 06-19 cleanup; user said "like motion", meaning animated, not the library). Also wrapped `saveSelectedRows` in try/catch/finally — it previously had no error handling (an unhandled rejection on failure). New `saveError` state renders a `.error-message` banner in the REVIEW panel (right side, next to the button) rather than reusing `errorMessage` (which renders in the left statement panel and would be off where the user is looking). `finally` always clears the spinner.
+
+2. A–Z categories: category lists are now sorted alphabetically by name. Sorted at the data level — `visibleCategories` and `getSelectableCategories` both `.sort((a,b)=>a.name.localeCompare(b.name))` on the filtered (new) array, so no mutation of `financeData`. This makes EVERY category dropdown A–Z (the uncategorized-row picker the user asked about, Ledger edit, Subscriptions) plus the Categories tab list, and new categories auto-place in order. The leading "Uncategorized" (empty value) and trailing "+ Add new category…" sentinel are added separately in JSX, so they stay first/last.
+
+Verified: build green (4.94s; bundles index-b216f761.css / index-3f905232.js). 82 node + 5 vitest still pass (no logic changed). Live in Chrome on the dev server (signed in, real data): Categories "available" list is fully A–Z (the lone out-of-order "Parking" is in the separate "retired categories" list); parsed the built-in sample and the uncategorized review-row dropdown reads Uncategorized → [A–Z categories] → + Add new category…; the `.btn-spinner` computed animationName resolves to finance-spin. Did NOT trigger a real save (would write synthetic rows to the live ledger) — discarded the synthetic draft via reload. NOT committed (local on `main`, on top of pushed 8108fd2); push only on user signal.
+
 ## 2026-06-22 02:50:08 - Whole app converted to a dark theme
 
 User asked to "change the entire color scheme to dark mode." Done as a permanent dark theme (not a light/dark toggle) that PRESERVES the brand identity — green accent, teal income, coral spending — inverted onto layered dark surfaces. No JSX/logic changes; CSS only (+ one `<meta name="theme-color">` in `index.html`).

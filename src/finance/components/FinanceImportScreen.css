@@ -129,6 +129,22 @@
   min-height: 38px;
 }
 
+@keyframes finance-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-spinner {
+  animation: finance-spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner {
+    animation-duration: 1.6s;
+  }
+}
+
 .ghost-action {
   background: var(--surface-2);
   border-color: var(--border);
@@ -1134,6 +1150,12 @@
   z-index: 20;
 }
 
+/* Right-align the panel when the trigger sits at the right edge (Ledger). */
+.month-picker.align-end .month-picker-panel {
+  left: auto;
+  right: 0;
+}
+
 .month-picker-actions {
   border-bottom: 1px solid var(--border-soft);
   display: flex;
@@ -1461,9 +1483,182 @@
   color: var(--spending-text);
 }
 
+.amount-in {
+  color: var(--income-text);
+}
+
+.amount-out {
+  color: var(--spending-text);
+}
+
+/* Clickable report elements (open the detail modal) */
+.report-clickable {
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.report-clickable:hover {
+  background: var(--surface-3);
+}
+
+.report-clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Report detail modal */
+.report-modal-overlay {
+  align-items: center;
+  animation: report-modal-fade 0.16s ease;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 50;
+}
+
+.report-modal {
+  animation: report-modal-rise 0.18s ease;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  max-width: 560px;
+  width: 100%;
+}
+
+@keyframes report-modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes report-modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report-modal-overlay,
+  .report-modal {
+    animation: none;
+  }
+}
+
+.report-modal-head {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 18px 20px;
+}
+
+.report-modal-titles h3 {
+  color: var(--text-strong);
+  font-size: 18px;
+  margin: 0;
+}
+
+.report-modal-titles p {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.report-modal-close {
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.report-modal-close:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.report-modal-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  padding: 16px 20px;
+}
+
+.report-modal-list {
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 4px 20px 18px;
+}
+
+.report-modal-row {
+  align-items: center;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 0;
+}
+
+.report-modal-row:first-child {
+  border-top: 0;
+}
+
+.report-modal-row .label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.report-modal-row .label > span {
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-modal-row small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.report-modal-row strong {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (max-width: 980px) {
   .finance-shell {
     padding: 18px;
+  }
+
+  .report-modal-overlay {
+    padding: 12px;
+  }
+
+  .report-modal {
+    max-height: 88vh;
   }
 
   .workspace-tabs {

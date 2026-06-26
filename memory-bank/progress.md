@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-06-25 19:22:00 - Ledger multi-month selection
+
+- Ledger now supports selecting one, several, or all months via the same dropdown checklist the Reports page uses (replaced the single-month select). State moved from `selectedMonth` to `ledgerMonths` (null = all); summary + transaction list + heading all respect the multi-month scope. Renamed reportMonthsByYear → monthsByYear (shared); added `.month-picker.align-end` so the Ledger panel opens leftward.
+- Reuses tested helpers (filterTransactionsByMonths, calculateMonthlySummary); build green; 88 node + 5 vitest pass.
+- LIVE CHROME CHECK PENDING — Claude in Chrome integration was disconnected this turn (Playwright barred by user rule). Local on `main`, not committed.
+
+## 2026-06-25 18:08:17 - "Refund" transaction type + PayPal deposits flagged for review
+
+- Added a 5th transaction type, Refund, with defined math: it REDUCES spending (net against its category + merchant + the total) and never counts as income. Fixes refunds for returned/cancelled purchases that previously imported as income.
+- New exported spendingDelta() in reports.js is the single source of the refund sign; calculateMonthlySummary/Trend, calculateCategorySpending/rankCategorySpending, and calculateTopMerchants all use it. Refund added to the Ledger edit Type dropdown and TYPE_SORT_ORDER; report-modal spending totals net refunds via sumSpending.
+- Parser: PayPal-transfer deposits now flag for review (income + low confidence + needsReview) instead of silently "income", so the user picks income vs refund. User chose review over auto-refund.
+- Verified: build green; 88 node (+4) + 5 vitest pass; live Chrome shows the Refund option in the right spot (edit cancelled, no write — refund math is unit-tested). Local on `main` (stacked on uncommitted 06-25 modal + 06-24 work), not committed.
+
+## 2026-06-25 17:06:48 - Clickable report drill-down modal
+
+- Every Reports section now opens a dismissible detail modal on click (summary + transaction list): category bars, the four cash-summary tiles (not savings rate), trend month rows, top-merchant rows, and largest-transaction rows.
+- Exported isSpending + transactionLabel from reports.js (with 2 new tests) so drill-down filters reuse the same income/spending logic; new reportDetail state + builder helpers + a shared clickableProps (role=button/Enter/Space) + .report-clickable styling.
+- Dismiss via overlay click, X button, or Escape; fade/rise animation (respects reduced-motion); role=dialog/aria-modal.
+- Verified: build green; 84 node + 5 vitest pass; live Chrome drill-downs (category, income tile, trend month, merchant, largest tx) all show correct summaries/lists and all dismissal paths work. Local on `main` (stacked on uncommitted 06-24 work), not committed.
+- Still open: external-savings transfer mislabeling (income/expense vs transfer_to_self) — user deciding between manual retype vs import auto-classification.
+
+## 2026-06-24 13:05:38 - Save spinner + A–Z category lists
+
+- "Save Selected" now shows an animated spinner ("Saving…", CSS finance-spin keyframe) and is disabled while the Supabase save + reload run, so the in-progress state is visible. Added try/catch/finally around the save (was unhandled) with a save-error banner in the review panel.
+- Category lists are sorted A–Z by name at the data level (visibleCategories + getSelectableCategories), so every dropdown (uncategorized-row picker, Ledger edit, Subscriptions) and the Categories tab are alphabetical, and new categories auto-place. "Uncategorized" stays first, "+ Add new category…" stays last.
+- Verified: build green; 82 node + 5 vitest pass; live Chrome confirmed the A–Z dropdown order and the spinner animation. Local on `main` (on top of pushed 8108fd2), not committed.
+
 ## 2026-06-22 02:50:08 - Whole app switched to a dark theme
 
 - Permanent dark mode (not a toggle) across the entire app, keeping the brand colors (green accent, teal income, coral spending) on layered dark surfaces.
