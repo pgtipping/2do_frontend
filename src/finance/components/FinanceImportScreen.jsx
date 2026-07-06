@@ -877,6 +877,7 @@ export default function FinanceImportScreen() {
   const reportCategories = rankCategorySpending(reportTransactions, {
     month: ALL_MONTHS,
     includeSelfTransfers,
+    monthCount: reportMonthCount,
   });
   const reportTopMerchants = calculateTopMerchants(reportTransactions, {
     includeSelfTransfers,
@@ -2465,6 +2466,9 @@ export default function FinanceImportScreen() {
                           <span className="muted-copy">
                             {formatMoney(entry.total)} ·{" "}
                             {Math.round(entry.share * 100)}%
+                            {showMonthlyAverages && entry.monthlyAverage !== null
+                              ? ` · ${formatMoney(entry.monthlyAverage)}/mo avg`
+                              : ""}
                           </span>
                         </div>
                         <div className="category-bar-track">
