@@ -111,6 +111,20 @@ export function calculateCategorySpending(
     }, {});
 }
 
+// How many transactions in scope count as spending (used as the divisor
+// for the "average per transaction" figure). Refunds are spending
+// transactions too, so they are counted; self-transfers only when the
+// toggle is on.
+export function calculateSpendingTransactionCount(
+  transactions,
+  { month, includeSelfTransfers = false } = {}
+) {
+  return transactions
+    .filter((transaction) => isInMonth(transaction, month))
+    .filter((transaction) => isSpending(transaction, includeSelfTransfers))
+    .length;
+}
+
 // Ranks categories biggest-first and adds each one's share of total spending.
 export function rankCategorySpending(transactions, options = {}) {
   const totals = calculateCategorySpending(transactions, options);

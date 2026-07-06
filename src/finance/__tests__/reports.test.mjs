@@ -9,6 +9,7 @@ import {
   calculateMonthlyCashflow,
   calculateMonthlySummary,
   calculateMonthlyTrend,
+  calculateSpendingTransactionCount,
   calculateTopMerchants,
   filterTransactionsByMonths,
   getLargestTransactions,
@@ -270,6 +271,20 @@ test("category spending optionally includes self transfers", () => {
       includeSelfTransfers: true,
     }),
     { cat_groc: 150, cat_rent: 200, cat_savings: 300 }
+  );
+});
+
+test("spending transaction count honors the self-transfer toggle", () => {
+  assert.equal(
+    calculateSpendingTransactionCount(reportRows, { month: ALL_MONTHS }),
+    3
+  );
+  assert.equal(
+    calculateSpendingTransactionCount(reportRows, {
+      month: ALL_MONTHS,
+      includeSelfTransfers: true,
+    }),
+    4
   );
 });
 
