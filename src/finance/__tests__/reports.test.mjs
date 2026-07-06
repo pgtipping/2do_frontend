@@ -300,6 +300,23 @@ test("ranked category spending sorts by total with a share of the whole", () => 
   assert.equal(Math.round(ranked[1].share * 100), 43);
 });
 
+test("ranked category spending adds a per-month average from the month count", () => {
+  const ranked = rankCategorySpending(reportRows, {
+    month: ALL_MONTHS,
+    monthCount: 2,
+  });
+  // cat_rent 200 total, cat_groc 150 total; both divided by 2 selected months
+  // (cat_rent only appears in January but still divides by 2 — empty months count).
+  assert.equal(ranked[0].categoryId, "cat_rent");
+  assert.equal(ranked[0].monthlyAverage, 100);
+  assert.equal(ranked[1].monthlyAverage, 75);
+});
+
+test("ranked category spending leaves the average null without a month count", () => {
+  const ranked = rankCategorySpending(reportRows, { month: ALL_MONTHS });
+  assert.equal(ranked[0].monthlyAverage, null);
+});
+
 test("top merchants rank spend by merchant and honor the self-transfer toggle", () => {
   assert.deepEqual(calculateTopMerchants(reportRows), [
     { merchant: "Landlord", total: 200 },

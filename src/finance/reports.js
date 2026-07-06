@@ -125,8 +125,12 @@ export function calculateSpendingTransactionCount(
     .length;
 }
 
-// Ranks categories biggest-first and adds each one's share of total spending.
+// Ranks categories biggest-first, adds each one's share of total spending,
+// and (when a monthCount is given) each one's average spend per selected
+// month. The denominator is the same monthCount for every category, so no
+// per-category month tracking is needed.
 export function rankCategorySpending(transactions, options = {}) {
+  const { monthCount } = options;
   const totals = calculateCategorySpending(transactions, options);
   const grandTotal = Object.values(totals).reduce((sum, value) => sum + value, 0);
 
@@ -135,6 +139,7 @@ export function rankCategorySpending(transactions, options = {}) {
       categoryId,
       total,
       share: grandTotal > 0 ? total / grandTotal : 0,
+      monthlyAverage: average(total, monthCount),
     }))
     .sort((first, second) => second.total - first.total);
 }
