@@ -31,8 +31,10 @@ import {
   ALL_MONTHS,
   DEFAULT_LEDGER_SORT,
   LEDGER_SORT_GROUPS,
+  average,
   calculateMonthlySummary,
   calculateMonthlyTrend,
+  calculateSpendingTransactionCount,
   calculateTopMerchants,
   filterTransactionsByMonths,
   getLargestTransactions,
@@ -865,6 +867,13 @@ export default function FinanceImportScreen() {
   });
   const reportSavingsRate =
     reportSummary.income > 0 ? reportSummary.net / reportSummary.income : null;
+  const reportMonthCount = effectiveReportMonths.length;
+  const showMonthlyAverages = reportMonthCount >= 2;
+  const reportSpendingCount = calculateSpendingTransactionCount(reportTransactions, {
+    month: ALL_MONTHS,
+    includeSelfTransfers,
+  });
+  const reportAvgPerTransaction = average(reportSummary.expenses, reportSpendingCount);
   const reportCategories = rankCategorySpending(reportTransactions, {
     month: ALL_MONTHS,
     includeSelfTransfers,
@@ -2379,6 +2388,11 @@ export default function FinanceImportScreen() {
                   >
                     <span>Income</span>
                     <strong>{formatMoney(reportSummary.income)}</strong>
+                    {showMonthlyAverages ? (
+                      <small className="stat-average">
+                        avg {formatMoney(average(reportSummary.income, reportMonthCount))}/mo
+                      </small>
+                    ) : null}
                   </div>
                   <div
                     className="stat-tile spending report-clickable"
@@ -2386,6 +2400,11 @@ export default function FinanceImportScreen() {
                   >
                     <span>Spending</span>
                     <strong>{formatMoney(reportSummary.expenses)}</strong>
+                    {showMonthlyAverages ? (
+                      <small className="stat-average">
+                        avg {formatMoney(average(reportSummary.expenses, reportMonthCount))}/mo
+                      </small>
+                    ) : null}
                   </div>
                   <div
                     className="stat-tile report-clickable"
@@ -2393,6 +2412,11 @@ export default function FinanceImportScreen() {
                   >
                     <span>Left over</span>
                     <strong>{formatMoney(reportSummary.net)}</strong>
+                    {showMonthlyAverages ? (
+                      <small className="stat-average">
+                        avg {formatMoney(average(reportSummary.net, reportMonthCount))}/mo
+                      </small>
+                    ) : null}
                   </div>
                   <div
                     className="stat-tile report-clickable"
@@ -2400,6 +2424,11 @@ export default function FinanceImportScreen() {
                   >
                     <span>Self-transfers</span>
                     <strong>{formatMoney(reportSummary.selfTransfers)}</strong>
+                    {showMonthlyAverages ? (
+                      <small className="stat-average">
+                        avg {formatMoney(average(reportSummary.selfTransfers, reportMonthCount))}/mo
+                      </small>
+                    ) : null}
                   </div>
                   <div className="stat-tile">
                     <span>Savings rate</span>
@@ -2409,6 +2438,12 @@ export default function FinanceImportScreen() {
                         : `${Math.round(reportSavingsRate * 100)}%`}
                     </strong>
                   </div>
+                  {reportAvgPerTransaction !== null ? (
+                    <div className="stat-tile">
+                      <span>Avg / transaction</span>
+                      <strong>{formatMoney(reportAvgPerTransaction)}</strong>
+                    </div>
+                  ) : null}
                 </div>
               </section>
 

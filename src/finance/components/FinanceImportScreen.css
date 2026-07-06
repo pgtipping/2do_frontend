@@ -1299,6 +1299,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+.stat-average {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .stat-tile.income strong {
   color: var(--income-text);
 }
