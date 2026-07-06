@@ -1,5 +1,26 @@
 # Active Context
 
+## 2026-07-06 19:57:15 - Reports view gains averages alongside totals
+
+User asked to "see averages in addition to totals in the report view". Built via subagent-driven development on branch `feat/report-averages` (7 commits, cf6645c..efab451), off `main` at 2b90d61. Spec: docs/superpowers/specs/2026-07-06-report-averages-design.md; plan: docs/superpowers/plans/2026-07-06-report-averages.md.
+
+Design decision the user landed on after review: every per-month average divides by the **number of selected months** (`effectiveReportMonths.length`), including months a category had no spending — the true monthly spend figure (category `$/mo` values reconcile to the total). They first picked "active months only" but reversed once it was pointed out that (a) the month picker only offers months that have data, so the distinction is a no-op at the period level, and (b) for a spend average a zero-spend month is a real $0 that must be counted. This simplified the build — no per-category month tracking needed.
+
+reports.js — all math in pure tested helpers, no division in JSX:
+- New `average(total, count)` → `total / count`, or `null` when count is 0/absent. Single helper backs every quotient (per-month sub-lines, per-category, avg/transaction, per-merchant).
+- New `calculateSpendingTransactionCount(transactions, {month, includeSelfTransfers})` — divisor for avg/transaction; honors the self-transfer toggle (refunds count; self-transfers only when on).
+- `rankCategorySpending` gains an optional `monthCount`; each row now carries `monthlyAverage = average(total, monthCount)` (null without monthCount). `calculateCategorySpending` untouched.
+- `calculateTopMerchants` rows gain `count` (charges) + `average` (per-charge). Existing merchant + refund tests updated for the new shape.
+
+FinanceImportScreen.jsx (Reports UI):
+- Cash summary: muted `avg $X/mo` sub-line under Income/Spending/Left over/Self-transfers, shown only when 2+ months selected (`showMonthlyAverages = reportMonthCount >= 2`); NOT on Savings rate. New "Avg / transaction" stat tile (total spending ÷ spending-tx count), shown when non-null → grid goes 5→6 tiles (auto-fit minmax(120px,1fr) reflows). New `.stat-average` CSS.
+- Spending by category: each row extends `$450 · 32%` → `· $75/mo avg`, same 2+-month suppression.
+- Top merchants: each row gains a small `$18 avg` (per-charge) under the name; NOT month-gated (per-transaction).
+
+Verified: `npm run build` green; `npm run test:node` 92/92 (was 88 — +4 helper tests). Every task passed a spec+quality review; final whole-branch review (opus) = ready to merge, no Critical/Important. Merged to local `main` on user signal.
+
+STILL OPEN — manual Chrome visual check of the rendered Reports tab (6-tile reflow at narrow/wide widths; sub-line/segment placement; a negative average like a fully-refunded merchant rendering `-$5.00 avg`). Deferred because the app is behind a Supabase magic-link login (email step) that can't be completed autonomously and there's no data without a real account. Numbers themselves are unit-tested; only layout/render is unconfirmed. Not pushed to origin (push only on user signal).
+
 ## 2026-06-25 19:22:00 - Ledger gains multi-month selection (mirrors Reports)
 
 User asked for the ability to select multiple months in the Ledger. Replaced the Ledger's single-month `<select>` with the same dropdown checklist the Reports page already uses.

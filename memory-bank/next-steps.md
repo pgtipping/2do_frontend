@@ -1,5 +1,13 @@
 # Next Steps
 
+## 2026-07-06 19:57:15 - Reports averages merged to local main — visual check + push pending
+
+Report averages feature is merged onto local `main` (7 commits, cf6645c..efab451). Two things remain:
+1. Manual Chrome visual check of the Reports tab (needs the user to log in via magic link, then eyeball: 6-tile cash-summary reflow, `avg $X/mo` sub-lines with 2+ vs 1 month selected, category `· $75/mo avg`, merchant `$18 avg`, and a negative average render if any refunds net a category/merchant below zero).
+2. Not pushed to origin — push on the user's signal (stacked on the earlier uncommitted/committed local `main` work).
+
+Backlog (unchanged): multi-PDF upload; README refresh; npm audit vulns (pdfjs-dist/vite); external-savings transfer auto-classification.
+
 ## 2026-06-21 22:22:23 - Reports rebuild built (local) — two features pending commit
 
 TWO uncommitted features on `main`, to land as SEPARATE commits on the user's signal:
