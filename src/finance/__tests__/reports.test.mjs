@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   ALL_MONTHS,
   DEFAULT_LEDGER_SORT,
+  average,
   calculateCategorySpending,
   calculateMonthlyCashflow,
   calculateMonthlySummary,
@@ -352,6 +353,14 @@ test("a refund nets against its category and merchant totals", () => {
     cat_shopping: 70,
   });
   assert.deepEqual(calculateTopMerchants(rows), [{ merchant: "Acme", total: 70 }]);
+});
+
+test("average divides total by count and guards a zero or missing divisor", () => {
+  assert.equal(average(200, 2), 100);
+  assert.equal(average(150, 2), 75);
+  assert.equal(average(0, 3), 0);
+  assert.equal(average(100, 0), null);
+  assert.equal(average(100), null);
 });
 
 test("transactionLabel prefers merchant, falls back to description, then Unknown", () => {

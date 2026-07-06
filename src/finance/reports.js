@@ -8,6 +8,17 @@ function absoluteAmount(amount) {
   return Math.abs(Number(amount) || 0);
 }
 
+// Generic average used for every quotient in the reports view: per-month
+// figures pass a month count, per-transaction figures pass a transaction
+// count. Returns null when there is nothing to divide by so callers can
+// render nothing.
+export function average(total, count) {
+  if (!count) {
+    return null;
+  }
+  return total / count;
+}
+
 function isInMonth(transaction, month) {
   if (!month || month === ALL_MONTHS) {
     return true;
