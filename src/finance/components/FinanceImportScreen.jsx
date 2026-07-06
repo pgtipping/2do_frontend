@@ -2552,6 +2552,7 @@ export default function FinanceImportScreen() {
                         >
                           <span className="label">
                             <span>{entry.merchant}</span>
+                            <small>{formatMoney(entry.average)} avg</small>
                           </span>
                           <strong>{formatMoney(entry.total)}</strong>
                         </div>
