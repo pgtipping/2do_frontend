@@ -144,12 +144,14 @@ export function rankCategorySpending(transactions, options = {}) {
     .sort((first, second) => second.total - first.total);
 }
 
-// Totals spending per merchant and returns the biggest `limit` of them.
+// Totals spending per merchant, plus how many charges made up that total
+// and the average charge size, then returns the biggest `limit` of them.
 export function calculateTopMerchants(
   transactions,
   { includeSelfTransfers = false, limit = 6 } = {}
 ) {
   const totals = new Map();
+  const counts = new Map();
 
   transactions
     .filter((transaction) => isSpending(transaction, includeSelfTransfers))
@@ -159,10 +161,16 @@ export function calculateTopMerchants(
         label,
         (totals.get(label) || 0) + spendingDelta(transaction, includeSelfTransfers)
       );
+      counts.set(label, (counts.get(label) || 0) + 1);
     });
 
   return Array.from(totals.entries())
-    .map(([merchant, total]) => ({ merchant, total }))
+    .map(([merchant, total]) => ({
+      merchant,
+      total,
+      count: counts.get(merchant),
+      average: average(total, counts.get(merchant)),
+    }))
     .sort(
       (first, second) =>
         second.total - first.total || first.merchant.localeCompare(second.merchant)

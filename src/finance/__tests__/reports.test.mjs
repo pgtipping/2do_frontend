@@ -319,12 +319,13 @@ test("ranked category spending leaves the average null without a month count", (
 
 test("top merchants rank spend by merchant and honor the self-transfer toggle", () => {
   assert.deepEqual(calculateTopMerchants(reportRows), [
-    { merchant: "Landlord", total: 200 },
-    { merchant: "Walmart", total: 150 },
+    { merchant: "Landlord", total: 200, count: 1, average: 200 },
+    { merchant: "Walmart", total: 150, count: 2, average: 75 },
   ]);
-  assert.deepEqual(calculateTopMerchants(reportRows, { includeSelfTransfers: true, limit: 1 }), [
-    { merchant: "Savings", total: 300 },
-  ]);
+  assert.deepEqual(
+    calculateTopMerchants(reportRows, { includeSelfTransfers: true, limit: 1 }),
+    [{ merchant: "Savings", total: 300, count: 1, average: 300 }]
+  );
 });
 
 test("largest transactions rank by size regardless of sign", () => {
@@ -384,7 +385,7 @@ test("a refund nets against its category and merchant totals", () => {
   assert.deepEqual(calculateCategorySpending(rows, { month: "2025-03" }), {
     cat_shopping: 70,
   });
-  assert.deepEqual(calculateTopMerchants(rows), [{ merchant: "Acme", total: 70 }]);
+  assert.deepEqual(calculateTopMerchants(rows), [{ merchant: "Acme", total: 70, count: 2, average: 35 }]);
 });
 
 test("average divides total by count and guards a zero or missing divisor", () => {
