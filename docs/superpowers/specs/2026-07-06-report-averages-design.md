@@ -57,6 +57,11 @@ mirrors how the adjacent total already displays.
 ### Spending by category card
 - Each row currently reads `$450 · 32%`. Extend to `$450 · 32% · $75/mo avg`, where
   the average is that category's total ÷ the selected month count.
+- The `· $X/mo avg` segment is shown only when **2 or more months** are selected — the same
+  suppression rule as the cash-summary sub-lines, and for the same reason (at one month a
+  category's `$/mo` equals its total, so it is noise). The `$450 · 32%` part is unchanged.
+  (Top-merchant `· $18 avg` is a per-transaction figure, not per-month, so it is *not*
+  gated on month count.)
 
 ### Where the money went — Top merchants
 - Each merchant row gains a muted `· $18 avg` = that merchant's total ÷ its number of
@@ -69,20 +74,28 @@ mirrors how the adjacent total already displays.
 
 ## Computation layer (`src/finance/reports.js`)
 
-All math is added as pure, exported, unit-tested helpers. No division happens in JSX.
+All math is added as pure, exported, unit-tested helpers. No division happens in JSX —
+including the Avg / transaction tile, which uses the generic `average` helper below rather
+than dividing inline.
 
-- `perMonthAverage(total, monthCount)` → `total / monthCount`, or `null` when `monthCount`
-  is 0. Callers render nothing on `null`.
+- `average(total, count)` → `total / count`, or `null` when `count` is 0 (or absent).
+  Callers render nothing on `null`. This single helper backs every quotient in the report:
+  the cash-summary per-month sub-lines (`average(total, monthCount)`), the per-category
+  per-month figure (`average(categoryTotal, monthCount)`), and the Avg / transaction tile
+  (`average(totalSpending, spendingTransactionCount)`). It is intentionally generically
+  named, not `perMonthAverage`, because the divisor is sometimes a month count and sometimes
+  a transaction count.
 - `calculateSpendingTransactionCount(transactions, { month, includeSelfTransfers })` →
-  count of spending transactions in scope (used for Avg / transaction). Honors
+  count of spending transactions in scope (the divisor for Avg / transaction). Honors
   `includeSelfTransfers`.
 - Extend `rankCategorySpending` to accept an optional `monthCount` and add a
-  `monthlyAverage` field to each output row (`perMonthAverage(total, monthCount)`, or `null`
-  when `monthCount` is 0/absent). Because the denominator is the same for every category,
-  no per-category month tracking is needed — `calculateCategorySpending`'s existing
-  `categoryId → total` reduction is untouched.
+  `monthlyAverage` field to each output row (`average(total, monthCount)`, or `null` when
+  `monthCount` is 0/absent). Because the denominator is the same for every category, no
+  per-category month tracking is needed — `calculateCategorySpending`'s existing
+  `categoryId → total` reduction is untouched. (The UI still gates *display* of the segment
+  on `monthCount >= 2`; the helper computes the value regardless.)
 - Extend `calculateTopMerchants` output with `count` (number of spending transactions for
-  that merchant) and `average` (`total / count`) per merchant.
+  that merchant) and `average` (`average(total, count)`) per merchant.
 
 The UI reads the selected month count once as `effectiveReportMonths.length` and passes it
 to `rankCategorySpending` and to the cash-summary sub-lines.
@@ -90,9 +103,10 @@ to `rankCategorySpending` and to the cash-summary sub-lines.
 ## Edge cases
 
 - Zero months selected → the report already shows its "pick at least one month" empty state,
-  so no averages render. Defensively, `perMonthAverage` returns `null` on a 0 denominator.
-- One month selected → per-month sub-lines suppressed; Avg / transaction and per-merchant
-  averages still shown (they do not depend on month count).
+  so no averages render. Defensively, `average` returns `null` on a 0 denominator.
+- One month selected → every per-month figure is suppressed (both the cash-summary sub-lines
+  and the per-category `· $X/mo avg`); Avg / transaction and per-merchant averages still
+  shown (they are per-transaction, not per-month).
 - A category or merchant with a net total of zero or below (e.g. a purchase fully refunded)
   still divides by the month count / its real transaction count; the average renders via
   `formatMoney`, matching the total beside it (may be `$0.00` or negative).
@@ -100,8 +114,9 @@ to `rankCategorySpending` and to the cash-summary sub-lines.
 ## Testing
 
 Add cases to `src/finance/__tests__/reports.test.mjs`:
-- `perMonthAverage` returns a correct non-null quotient for a normal case, and `null` on a
-  zero denominator.
+- `average` returns a correct non-null quotient for a normal case, and `null` on a zero (or
+  absent) denominator — exercised with both a month-count divisor and a transaction-count
+  divisor.
 - `calculateSpendingTransactionCount` with `includeSelfTransfers` off vs. on (a
   self-transfer flips from excluded to counted).
 - `rankCategorySpending` with a `monthCount` exposes correct `monthlyAverage` per row,
