@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__plugin_playwright_playwright"
+    ]
+  }
+}
