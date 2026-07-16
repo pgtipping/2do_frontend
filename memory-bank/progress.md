@@ -468,3 +468,7 @@ Verification:
 - Finance/import tests: 65 passed (54 prior + 11 new).
 - Vite production build: passed.
 - Live verification in user's Chrome tab against 134 saved transactions: button shows up, panel opens, empty-state copy reads "No duplicate clusters found across your saved transactions", close returns to the table view. The user has never duplicate-uploaded, so empty is the correct result.
+
+## 2026-07-06 21:15:00 - Import Review metric tiles became filter buttons
+
+Made the four Import Review metric tiles (Ready / Review / Uncategorized / Selected) clickable filters over the review row list, with button click feedback and an active-state ring. One filter at a time; clicking the active tile clears; tiles disable at count 0; filter resets on new parse / PDF extract; empty-filter inline message. Converted tiles from div to button with aria-pressed. Build green; verified live in Chrome (sample statement, all four filter paths + toggle-off confirmed via DOM). Local on main, uncommitted.

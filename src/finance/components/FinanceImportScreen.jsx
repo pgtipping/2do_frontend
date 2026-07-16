@@ -139,6 +139,7 @@ export default function FinanceImportScreen() {
   const [saveError, setSaveError] = useState("");
   const [pdfStatus, setPdfStatus] = useState("");
   const [selectedRows, setSelectedRows] = useState(new Set());
+  const [reviewFilter, setReviewFilter] = useState(null);
   const [financeData, setFinanceData] = useState(null);
   const [loadError, setLoadError] = useState("");
   // null = all months selected; otherwise an explicit list of "YYYY-MM" keys.
@@ -251,6 +252,7 @@ export default function FinanceImportScreen() {
         createId: createStableId,
       });
       setDraft(nextDraft);
+      setReviewFilter(null);
       setSelectedRows(
         new Set(
           nextDraft.rows
@@ -260,6 +262,7 @@ export default function FinanceImportScreen() {
       );
     } catch (error) {
       setDraft(null);
+      setReviewFilter(null);
       setSelectedRows(new Set());
       setErrorMessage(error.message || "Statement could not be parsed.");
     }
@@ -279,6 +282,7 @@ export default function FinanceImportScreen() {
       const extractedText = await extractTextFromPdfFile(file);
       setStatementText(extractedText);
       setDraft(null);
+      setReviewFilter(null);
       setSelectedRows(new Set());
       setSaveResult(null);
       setPdfStatus(`Extracted text from ${file.name}. Review it, then parse.`);
@@ -830,6 +834,32 @@ export default function FinanceImportScreen() {
   const uncategorizedCount =
     draft?.rows.filter((row) => !isReviewRowCategorized(row)).length || 0;
   const selectedCount = selectedRows.size;
+
+  // Each metric tile doubles as a filter: clicking one shows only the
+  // rows it counts. One filter is active at a time; clicking the active
+  // tile (or the tile whose count dropped to zero) clears back to all.
+  const reviewRowMatchesFilter = (row) => {
+    switch (reviewFilter) {
+      case "ready":
+        return row.status === "ready";
+      case "needs_review":
+        return row.status === "needs_review";
+      case "uncategorized":
+        return !isReviewRowCategorized(row);
+      case "selected":
+        return selectedRows.has(row.id);
+      default:
+        return true;
+    }
+  };
+
+  const toggleReviewFilter = (filterKey) => {
+    setReviewFilter((current) => (current === filterKey ? null : filterKey));
+  };
+
+  const visibleReviewRows = draft
+    ? draft.rows.filter(reviewRowMatchesFilter)
+    : [];
   const saveSummary = saveResult
     ? summarizeReviewedImportSave({
         createdTransactionCount: saveResult.createdTransactionCount,
@@ -1305,28 +1335,60 @@ export default function FinanceImportScreen() {
             </div>
           ) : null}
 
-          <div className="import-metrics" aria-label="Import metrics">
-            <div>
+          <div className="import-metrics" role="group" aria-label="Filter review rows">
+            <button
+              type="button"
+              className={reviewFilter === "ready" ? "is-active" : undefined}
+              aria-pressed={reviewFilter === "ready"}
+              disabled={readyCount === 0}
+              onClick={() => toggleReviewFilter("ready")}
+            >
               <span>{readyCount}</span>
               Ready
-            </div>
-            <div>
+            </button>
+            <button
+              type="button"
+              className={reviewFilter === "needs_review" ? "is-active" : undefined}
+              aria-pressed={reviewFilter === "needs_review"}
+              disabled={reviewCount === 0}
+              onClick={() => toggleReviewFilter("needs_review")}
+            >
               <span>{reviewCount}</span>
               Review
-            </div>
-            <div className={uncategorizedCount > 0 ? "metric-uncategorized" : undefined}>
+            </button>
+            <button
+              type="button"
+              className={`${uncategorizedCount > 0 ? "metric-uncategorized" : ""}${
+                reviewFilter === "uncategorized" ? " is-active" : ""
+              }`.trim() || undefined}
+              aria-pressed={reviewFilter === "uncategorized"}
+              disabled={uncategorizedCount === 0}
+              onClick={() => toggleReviewFilter("uncategorized")}
+            >
               <span>{uncategorizedCount}</span>
               Uncategorized
-            </div>
-            <div>
+            </button>
+            <button
+              type="button"
+              className={reviewFilter === "selected" ? "is-active" : undefined}
+              aria-pressed={reviewFilter === "selected"}
+              disabled={selectedCount === 0}
+              onClick={() => toggleReviewFilter("selected")}
+            >
               <span>{selectedCount}</span>
               Selected
-            </div>
+            </button>
           </div>
+
+          {draft && reviewFilter && visibleReviewRows.length === 0 ? (
+            <div className="empty-review">
+              No rows match this filter. Select the same tile again to show all rows.
+            </div>
+          ) : null}
 
           {draft ? (
             <div className="review-table">
-              {draft.rows.map((row) => {
+              {visibleReviewRows.map((row) => {
                 const isUncategorized = !isReviewRowCategorized(row);
 
                 return (

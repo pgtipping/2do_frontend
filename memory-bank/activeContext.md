@@ -652,3 +652,24 @@ Verification:
 - Finance/import tests: 65 passed (added 11).
 - Vite production build: passed.
 - Live verification in user's Chrome tab: opened Ledger (134 saved transactions), clicked Find duplicates, panel rendered with the correct empty state "No duplicate clusters found across your saved transactions" — the user has never duplicate-uploaded, so empty is correct. Close button returns to the regular table view.
+
+## 2026-07-06 21:15:00 - Import Review metric tiles are now filter buttons
+
+User asked to make the four Import Review metric tiles (Ready, Review, Uncategorized, Selected) act like buttons: click one to (a) get button-like click feedback and (b) filter the review list to only the rows that tile counts. Built it in `FinanceImportScreen.jsx` + `FinanceImportScreen.css`.
+
+Behavior:
+
+- New `reviewFilter` state (null | "ready" | "needs_review" | "uncategorized" | "selected"). One filter active at a time.
+- `reviewRowMatchesFilter(row)` predicate: ready → status "ready"; review → status "needs_review"; uncategorized → no categoryId; selected → selectedRows.has(id). `visibleReviewRows` = draft.rows filtered by it; the table maps over `visibleReviewRows` instead of `draft.rows`.
+- `toggleReviewFilter(key)` toggles: clicking the active tile clears back to all; clicking a different tile switches.
+- Tiles converted from `<div>` to `<button type="button">` with `aria-pressed`, an `is-active` class (accent ring; amber ring on the uncategorized tile), and `disabled` when the count is 0. Group role changed to `role="group" aria-label="Filter review rows"`.
+- Filter resets to null on every new parse (`parseStatement` success + failure paths) and on PDF extract (`importPdf`), so a stale filter never hides rows from a fresh statement.
+- Empty-filter state: if a filter is active and matches zero rows, an inline message tells the user to click the same tile again to show all.
+
+Verification:
+
+- Vite production build: passed (103 modules).
+- Live in user's Chrome tab (dev server localhost:5173, already logged in): parsed the sample statement (5 rows; Ready 4 / Review 1 / Uncategorized 2 / Selected 3). Confirmed via DOM + screenshots: Uncategorized filter shows exactly the 2 uncategorized rows with active ring; switching to Ready moves the active state; toggle-off returns all 5 rows with aria-pressed=false on all tiles; Selected filter shows exactly the 3 checked rows.
+- No component unit test added — the project's node --test suite covers pure finance modules only; this is in-component view state, verified live (consistent with prior UI-only changes).
+
+Status: local edit on `main`, NOT committed. Stacked on top of the still-unpushed 14 commits (13 Reports-averages + the Playwright settings commit e64eebe).
