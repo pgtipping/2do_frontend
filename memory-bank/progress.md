@@ -4,8 +4,8 @@
 
 - Reports view now shows averages next to every total: per-month `avg $X/mo` under the four cash-summary tiles, a new "Avg / transaction" tile, a `· $75/mo avg` segment on category rows, and a per-charge `$18 avg` on merchant rows.
 - All math in one tested helper `average(total, count)` (null on 0/absent divisor); new `calculateSpendingTransactionCount`; `rankCategorySpending` gains `monthlyAverage` via a `monthCount` option; `calculateTopMerchants` gains `count` + `average`. Per-month figures divide by the count of selected months (empty months included — the true spend average) and are suppressed at 1 month; per-transaction figures are not month-gated. `includeSelfTransfers` threaded throughout.
-- Built via subagent-driven development (7 commits, cf6645c..efab451). Build green; 92 node (+4) + vitest pass. Per-task spec+quality reviews all clean; final opus whole-branch review: ready to merge. Merged to local `main`.
-- OPEN: manual Chrome visual check of the rendered Reports tab still pending (magic-link login blocks an autonomous check; numbers are unit-tested, only layout unconfirmed). Not pushed.
+- Built via subagent-driven development (7 commits, cf6645c..efab451). Build green; 92 node (+4) + vitest pass. Per-task spec+quality reviews all clean; final opus whole-branch review: ready to merge. Merged to local `main` and pushed.
+- DONE (reconciled 2026-07-16): manual Chrome visual check completed live (browser already logged in — no magic link needed). Confirmed multi-month sub-lines incl. the negative Left over avg, the Avg/transaction tile, clean 6-tile reflow at 923px, category `/mo avg`, merchant per-charge avg, and one-month suppression. Pushed and live on `origin/main`.
 
 ## 2026-06-25 19:22:00 - Ledger multi-month selection
 

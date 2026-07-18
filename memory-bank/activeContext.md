@@ -17,9 +17,9 @@ FinanceImportScreen.jsx (Reports UI):
 - Spending by category: each row extends `$450 · 32%` → `· $75/mo avg`, same 2+-month suppression.
 - Top merchants: each row gains a small `$18 avg` (per-charge) under the name; NOT month-gated (per-transaction).
 
-Verified: `npm run build` green; `npm run test:node` 92/92 (was 88 — +4 helper tests). Every task passed a spec+quality review; final whole-branch review (opus) = ready to merge, no Critical/Important. Merged to local `main` on user signal.
+Verified: `npm run build` green; `npm run test:node` 92/92 (was 88 — +4 helper tests). Every task passed a spec+quality review; final whole-branch review (opus) = ready to merge, no Critical/Important. Merged to local `main`, then pushed to origin.
 
-STILL OPEN — manual Chrome visual check of the rendered Reports tab (6-tile reflow at narrow/wide widths; sub-line/segment placement; a negative average like a fully-refunded merchant rendering `-$5.00 avg`). Deferred because the app is behind a Supabase magic-link login (email step) that can't be completed autonomously and there's no data without a real account. Numbers themselves are unit-tested; only layout/render is unconfirmed. Not pushed to origin (push only on user signal).
+RESOLVED (reconciled 2026-07-16): the manual Chrome visual check WAS completed — the browser was already logged in on the dev server, so no magic link was needed. Verified live against real data (13 months): cash-summary sub-lines render (income avg $1,965.39/mo, spending avg $3,173.12/mo, and the negative case Left over avg -$1,207.74/mo), the new Avg/transaction tile ($79.02), all 6 tiles reflow cleanly with no horizontal overflow even at the 923px narrow layout, category rows show `· $/mo avg`, merchant rows show a per-charge `$X avg`, and the Largest-transactions column is untouched. One-month test (2024-12): all `/mo` figures suppressed (zero cash sub-lines, category rows drop to `$… · %`) while Avg/transaction and merchant avg stay. Feature is pushed and live on `origin/main`.
 
 ## 2026-06-25 19:22:00 - Ledger gains multi-month selection (mirrors Reports)
 
@@ -672,4 +672,4 @@ Verification:
 - Live in user's Chrome tab (dev server localhost:5173, already logged in): parsed the sample statement (5 rows; Ready 4 / Review 1 / Uncategorized 2 / Selected 3). Confirmed via DOM + screenshots: Uncategorized filter shows exactly the 2 uncategorized rows with active ring; switching to Ready moves the active state; toggle-off returns all 5 rows with aria-pressed=false on all tiles; Selected filter shows exactly the 3 checked rows.
 - No component unit test added — the project's node --test suite covers pure finance modules only; this is in-component view state, verified live (consistent with prior UI-only changes).
 
-Status: local edit on `main`, NOT committed. Stacked on top of the still-unpushed 14 commits (13 Reports-averages + the Playwright settings commit e64eebe).
+Status: committed as `7ac427f` and pushed. (Reconciled 2026-07-16: this line originally read "local edit, NOT committed, still-unpushed 14 commits" — written before the commit landed. Everything through `7ac427f` is now on `origin/main`; origin == HEAD, working tree clean.)

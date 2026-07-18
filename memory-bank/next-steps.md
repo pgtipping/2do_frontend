@@ -1,10 +1,11 @@
 # Next Steps
 
-## 2026-07-06 19:57:15 - Reports averages merged to local main — visual check + push pending
+## 2026-07-16 19:17:32 - State reconciled: recent features shipped and pushed
 
-Report averages feature is merged onto local `main` (7 commits, cf6645c..efab451). Two things remain:
-1. Manual Chrome visual check of the Reports tab (needs the user to log in via magic link, then eyeball: 6-tile cash-summary reflow, `avg $X/mo` sub-lines with 2+ vs 1 month selected, category `· $75/mo avg`, merchant `$18 avg`, and a negative average render if any refunds net a category/merchant below zero).
-2. Not pushed to origin — push on the user's signal (stacked on the earlier uncommitted/committed local `main` work).
+Nothing pending from the last two features. Verified from git: on `main`, working tree clean, `origin/main` == HEAD (all pushed), `npm run test:node` 92/92.
+- Report averages (07-06, commits cf6645c..efab451): done, visual-checked live, pushed. The earlier "visual check + push pending" note was stale — both are complete.
+- Import Review metric-tile filters (commit `7ac427f`): done and pushed. Its own memory-bank entry had a stale "NOT committed / still-unpushed" status line, now corrected.
+- Playwright MCP blocked for this project (commit `e64eebe`).
 
 Backlog (unchanged): multi-PDF upload; README refresh; npm audit vulns (pdfjs-dist/vite); external-savings transfer auto-classification.
 
